@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+.DS_Store
+node_modules/
+.vercel
+.env
+.env.local
+**/dados_escola.json
+!data/dados_escola.json
