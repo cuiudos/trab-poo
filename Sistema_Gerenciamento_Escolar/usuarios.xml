@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SistemaGerenciamentoEscolar>
+  <Diretor>
+    <Usuario login="diretor" senha="1234">
+      <Nome>Álvaro Gonçalves de Carvalho</Nome>
+      <Cpf>11111111111</Cpf>
+    </Usuario>
+  </Diretor>
+  <Professores>
+    <Professor login="danton" senha="1234">
+      <Nome>Danton Rodrigues Diniz</Nome>
+      <Cpf>22222222222</Cpf>
+      <Disciplina>Matemática</Disciplina>
+    </Professor>
+    <Professor login="gustavo" senha="1234">
+      <Nome>Gustavo Almeida Reis</Nome>
+      <Cpf>33333333333</Cpf>
+      <Disciplina>Português</Disciplina>
+    </Professor>
+  </Professores>
+  <Alunos>
+    <Aluno login="eduardo" senha="1234">
+      <Nome>Eduardo Nobre de Oliveira Lino</Nome>
+      <Cpf>44444444444</Cpf>
+      <Turma>3º Ano A</Turma>
+    </Aluno>
+    <Aluno login="matheus" senha="1234">
+      <Nome>Matheus Augusto Alves Goveia Damião</Nome>
+      <Cpf>55555555555</Cpf>
+      <Turma>3º Ano A</Turma>
+    </Aluno>
+    <Aluno login="pedro" senha="1234">
+      <Nome>Pedro Henrique Alves Emerick</Nome>
+      <Cpf>66666666666</Cpf>
+      <Turma>3º Ano A</Turma>
+    </Aluno>
+  </Alunos>
+</SistemaGerenciamentoEscolar>

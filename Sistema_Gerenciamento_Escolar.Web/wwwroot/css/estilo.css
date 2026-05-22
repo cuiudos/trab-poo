@@ -1,0 +1,453 @@
+:root {
+  --rosa: #e8b4bc;
+  --rosa-escuro: #c97b8b;
+  --verde: #5a7d6a;
+  --verde-claro: #a8c5b5;
+  --creme: #faf6f1;
+  --creme-2: #f3ebe3;
+  --texto: #2d2926;
+  --texto-suave: #6b6560;
+  --branco: #ffffff;
+  --sombra: 0 24px 60px rgba(45, 41, 38, 0.12);
+  --radius: 16px;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Outfit", system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--texto);
+  background: var(--creme);
+  min-height: 100vh;
+}
+
+/* —— Login (layout tipo Vercel / floral) —— */
+.login-layout {
+  display: grid;
+  min-height: 100vh;
+}
+
+@media (min-width: 900px) {
+  .login-layout {
+    grid-template-columns: 1.1fr 1fr;
+  }
+}
+
+.login-hero {
+  position: relative;
+  background: linear-gradient(145deg, #5a7d6a 0%, #3d5a4a 45%, #2a4035 100%);
+  color: var(--branco);
+  padding: 3rem 2.5rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.hero-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  background-image:
+    radial-gradient(circle at 20% 80%, var(--rosa) 0%, transparent 40%),
+    radial-gradient(circle at 80% 20%, var(--verde-claro) 0%, transparent 35%);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+}
+
+.hero-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  margin-bottom: 1.5rem;
+}
+
+.login-hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 6vw, 4rem);
+  font-weight: 600;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+
+.login-hero h1 span {
+  color: var(--rosa);
+  font-style: italic;
+}
+
+.login-hero p {
+  font-size: 1.05rem;
+  opacity: 0.9;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.hero-features {
+  list-style: none;
+  font-size: 0.95rem;
+  opacity: 0.85;
+}
+
+.hero-features li {
+  padding: 0.35rem 0;
+  padding-left: 1.2rem;
+  position: relative;
+}
+
+.hero-features li::before {
+  content: "✿";
+  position: absolute;
+  left: 0;
+  color: var(--rosa);
+  font-size: 0.75rem;
+}
+
+.floating-flowers {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  gap: 1rem;
+  font-size: 2rem;
+  opacity: 0.35;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.login-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--creme);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--branco);
+  padding: 2.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--sombra);
+  border: 1px solid rgba(201, 123, 139, 0.12);
+}
+
+.login-card h2 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+.login-sub {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.login-sub code {
+  background: var(--creme-2);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.role-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: var(--creme-2);
+  padding: 0.35rem;
+  border-radius: 12px;
+}
+
+.role-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.role-tab.active {
+  background: var(--branco);
+  color: var(--verde);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+#form-login label {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+#form-login label span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--texto-suave);
+  margin-bottom: 0.35rem;
+}
+
+#form-login input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5ddd6;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#form-login input:focus {
+  outline: none;
+  border-color: var(--rosa-escuro);
+  box-shadow: 0 0 0 3px rgba(201, 123, 139, 0.2);
+}
+
+.msg-erro {
+  color: #b42318;
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 0.85rem 1.25rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--verde) 0%, #3d5a4a 100%);
+  color: var(--branco);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(90, 125, 106, 0.35);
+}
+
+.btn-sm {
+  width: auto;
+  margin-top: 0.5rem;
+}
+
+.btn-ghost {
+  border: 1px solid #e5ddd6;
+  background: transparent;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--texto-suave);
+}
+
+.login-hint {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+
+.login-hint summary {
+  cursor: pointer;
+}
+
+.login-hint ul {
+  margin-top: 0.5rem;
+  padding-left: 1.2rem;
+}
+
+/* —— App —— */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  background: var(--branco);
+  border-bottom: 1px solid #eee6df;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--verde);
+}
+
+.user-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.badge-perfil {
+  background: var(--creme-2);
+  color: var(--verde);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.app-main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.painel h2 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card {
+  background: var(--branco);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  border: 1px solid #eee6df;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.card h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+  color: var(--verde);
+}
+
+.card input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5ddd6;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.card-wide {
+  margin-top: 0.5rem;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.lista-turmas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.turma-bloco {
+  background: var(--creme);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.turma-bloco h4 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin-bottom: 0.35rem;
+}
+
+.turma-bloco .meta {
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  margin-bottom: 0.75rem;
+}
+
+.tabela-alunos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.tabela-alunos th,
+.tabela-alunos td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #e5ddd6;
+}
+
+.alert {
+  background: #fff4e5;
+  border: 1px solid #ffc966;
+  padding: 1rem;
+  border-radius: 12px;
+  color: #8a5a00;
+}
+
+.aluno-resumo {
+  max-width: 420px;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.aluno-resumo strong {
+  color: var(--verde);
+}
+
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--texto);
+  color: var(--branco);
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  z-index: 100;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
