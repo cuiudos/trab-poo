@@ -17,19 +17,11 @@ Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno).
 
 ## Login web (Supabase)
 
-| Perfil | E-mail | Senha (após setup) |
-|--------|--------|---------------------|
-| Diretor | `diretor@acacias.edu.br` | `Acacias@2025` |
-| Professor | `danton@acacias.edu.br` | `Acacias@2025` |
-| Aluno | `pedro@acacias.edu.br` | `Acacias@2025` |
-
-## Login console (XML local)
-
 | Perfil | Usuário | Senha |
 |--------|---------|-------|
-| Diretor | `diretor` | `1234` |
-| Professor | `danton` | `1234` |
-| Aluno | `pedro` | `1234` |
+| Diretor | `diretor1` | `diretor123` |
+| Professor | `profesor2` | `profesor23` |
+| Aluno | `alunos123` | `alunos123` |
 
 ## Rodar no PC (console)
 

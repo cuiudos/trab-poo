@@ -4,14 +4,11 @@
       "nome": "3º Ano A",
       "professorNome": "Danton Rodrigues Diniz",
       "alunos": [
-        { "nome": "Eduardo Nobre de Oliveira Lino", "cpf": "44444444444", "nota": 0, "faltas": 0 },
-        { "nome": "Matheus Augusto Alves Goveia Damião", "cpf": "55555555555", "nota": 0, "faltas": 0 },
         { "nome": "Pedro Henrique Alves Emerick", "cpf": "66666666666", "nota": 10, "faltas": 1 }
       ]
     }
   ],
   "professores": [
-    { "nome": "Danton Rodrigues Diniz", "cpf": "22222222222", "disciplina": "Matemática", "turmaNome": "3º Ano A" },
-    { "nome": "Gustavo Almeida Reis", "cpf": "33333333333", "disciplina": "Português", "turmaNome": null }
+    { "nome": "Danton Rodrigues Diniz", "cpf": "22222222222", "disciplina": "Matemática", "turmaNome": "3º Ano A" }
   ]
 }

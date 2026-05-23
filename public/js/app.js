@@ -45,7 +45,8 @@ async function initSupabase() {
 }
 
 async function buscarIdPorEmail(email) {
-  const r = await adminPost("/api/admin/buscar-email", { email: email.trim().toLowerCase() });
+  const e = loginParaEmail(email);
+  const r = await adminPost("/api/admin/buscar-email", { email: e });
   if (!r.ok) return null;
   return r.id;
 }
@@ -59,6 +60,11 @@ document.querySelectorAll(".role-tab").forEach((btn) => {
   });
 });
 
+function loginParaEmail(valor) {
+  const v = valor.trim().toLowerCase();
+  return v.includes("@") ? v : `${v}@acacias.edu.br`;
+}
+
 $("#form-login").addEventListener("submit", async (e) => {
   e.preventDefault();
   const erro = $("#login-erro");
@@ -69,7 +75,7 @@ $("#form-login").addEventListener("submit", async (e) => {
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: $("#email").value.trim().toLowerCase(),
+      email: loginParaEmail($("#email").value),
       password: $("#senha").value,
     });
 

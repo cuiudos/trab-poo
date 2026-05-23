@@ -41,12 +41,12 @@
 
         <form id="form-login" autocomplete="on">
           <label>
-            <span>E-mail institucional</span>
-            <input type="email" id="email" placeholder="seu.nome@acacias.edu.br" required autocomplete="email" />
+            <span>Usuário</span>
+            <input type="text" id="email" placeholder="ex: diretor1" required autocomplete="username" />
           </label>
           <label>
             <span>Senha</span>
-            <input type="password" id="senha" placeholder="Mínimo 8 caracteres" required minlength="8" autocomplete="current-password" />
+            <input type="password" id="senha" placeholder="Sua senha" required minlength="8" autocomplete="current-password" />
           </label>
           <p id="login-erro" class="msg-erro" hidden></p>
           <button type="submit" class="btn-primary" id="btn-login">Continuar →</button>
@@ -55,10 +55,9 @@
         <details class="login-hint">
           <summary>Contas de demonstração</summary>
           <ul>
-            <li><strong>Diretor:</strong> diretor@acacias.edu.br</li>
-            <li><strong>Professor:</strong> danton@acacias.edu.br</li>
-            <li><strong>Aluno:</strong> pedro@acacias.edu.br</li>
-            <li>Senha (após setup): <code>Acacias@2025</code></li>
+            <li><strong>Diretor:</strong> diretor1 / diretor123</li>
+            <li><strong>Professor:</strong> profesor2 / profesor23</li>
+            <li><strong>Aluno:</strong> alunos123 / alunos123</li>
           </ul>
         </details>
       </div>
