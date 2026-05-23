@@ -21,7 +21,8 @@ function loadEnv() {
   const lines = readFileSync(path, "utf8").split("\n");
   const env = {};
   for (const line of lines) {
-    const m = line.match(/^([^#=]+)=(.*)$/);
+    const clean = line.replace(/\r$/, "");
+    const m = clean.match(/^([^#=]+)=(.*)$/);
     if (m) env[m[1].trim()] = m[2].trim();
   }
   return env;
