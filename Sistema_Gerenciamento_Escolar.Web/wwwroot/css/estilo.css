@@ -29,6 +29,10 @@ body {
   min-height: 100vh;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 /* —— Login (layout tipo Vercel / floral) —— */
 .login-layout {
   display: grid;
