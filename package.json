@@ -2,8 +2,10 @@
   "name": "trab-poo-escolar",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "build": "node -e \"console.log('Build OK')\""
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
-    "fast-xml-parser": "^4.5.0"
+    "@supabase/supabase-js": "^2.49.1"
   }
 }

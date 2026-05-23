@@ -1,0 +1,12 @@
+Sistema_Gerenciamento_Escolar/
+Sistema_Gerenciamento_Escolar.Web/
+**/bin/
+**/obj/
+**/.vs/
+scripts/
+supabase/
+data/
+*.sln
+*.csproj
+.env
+.env.local
