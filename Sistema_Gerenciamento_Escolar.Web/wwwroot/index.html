@@ -3,21 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EduGestão — Sistema Escolar</title>
+  <title>Colégio Jardim das Acácias — Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/estilo.css" />
 </head>
 <body>
-  <!-- Tela de login (estilo floral / Vercel) -->
   <div id="tela-login" class="login-layout">
     <aside class="login-hero">
       <div class="hero-pattern"></div>
       <div class="hero-content">
-        <span class="hero-badge">Gestão escolar</span>
-        <h1>Edu<span>Flora</span></h1>
-        <p>Controle acadêmico com a mesma elegância de um jardim em flor.</p>
+        <span class="hero-badge">Colégio Jardim das Acácias</span>
+        <h1>Portal <span>Acadêmico</span></h1>
+        <p>Gestão escolar segura com Supabase — senhas criptografadas e acesso por perfil.</p>
         <ul class="hero-features">
           <li>Diretor — acesso completo</li>
           <li>Professor — turmas e notas</li>
@@ -32,7 +31,7 @@
     <main class="login-panel">
       <div class="login-card">
         <h2>Entrar</h2>
-        <p class="login-sub">Credenciais em <code>usuarios.xml</code></p>
+        <p class="login-sub">Login protegido · <strong>Supabase Auth</strong></p>
 
         <div class="role-tabs" role="tablist">
           <button type="button" class="role-tab active" data-tipo="diretor">Diretor</button>
@@ -42,33 +41,35 @@
 
         <form id="form-login" autocomplete="on">
           <label>
-            <span>Usuário</span>
-            <input type="text" id="usuario" placeholder="ex: diretor" required />
+            <span>E-mail institucional</span>
+            <input type="email" id="email" placeholder="seu.nome@acacias.edu.br" required autocomplete="email" />
           </label>
           <label>
             <span>Senha</span>
-            <input type="password" id="senha" placeholder="••••" required />
+            <input type="password" id="senha" placeholder="Mínimo 8 caracteres" required minlength="8" autocomplete="current-password" />
           </label>
           <p id="login-erro" class="msg-erro" hidden></p>
-          <button type="submit" class="btn-primary">Continuar →</button>
+          <button type="submit" class="btn-primary" id="btn-login">Continuar →</button>
         </form>
 
         <details class="login-hint">
-          <summary>Contas de teste</summary>
+          <summary>Contas de demonstração</summary>
           <ul>
-            <li><strong>Diretor:</strong> diretor / 1234</li>
-            <li><strong>Professor:</strong> danton / 1234</li>
-            <li><strong>Aluno:</strong> pedro / 1234</li>
+            <li><strong>Diretor:</strong> diretor@acacias.edu.br</li>
+            <li><strong>Professor:</strong> danton@acacias.edu.br</li>
+            <li><strong>Aluno:</strong> pedro@acacias.edu.br</li>
+            <li>Senha (após setup): <code>Acacias@2025</code></li>
           </ul>
         </details>
       </div>
     </main>
   </div>
 
-  <!-- Painéis após login -->
   <div id="app" class="app-shell" hidden>
     <header class="app-header">
-      <div class="brand">EduFlora</div>
+      <div class="brand">
+        <span class="brand-escola">Colégio Jardim das Acácias</span>
+      </div>
       <div class="user-info">
         <span id="user-nome"></span>
         <span id="user-perfil" class="badge-perfil"></span>
@@ -77,7 +78,6 @@
     </header>
 
     <main class="app-main">
-      <!-- Diretor -->
       <section id="painel-diretor" class="painel" hidden>
         <h2>Painel do Diretor</h2>
         <div class="grid-cards">
@@ -88,62 +88,59 @@
           </article>
           <article class="card">
             <h3>Novo aluno</h3>
-            <input type="text" id="dir-al-nome" placeholder="Nome" />
+            <input type="text" id="dir-al-nome" placeholder="Nome completo" />
             <input type="text" id="dir-al-cpf" placeholder="CPF" />
-            <input type="text" id="dir-al-turma" placeholder="Turma" />
-            <input type="text" id="dir-al-user" placeholder="Login (XML)" />
-            <input type="password" id="dir-al-pass" placeholder="Senha" />
+            <input type="text" id="dir-al-turma" placeholder="Turma (ex: 3º Ano A)" />
+            <input type="email" id="dir-al-email" placeholder="E-mail do aluno" />
+            <input type="password" id="dir-al-pass" placeholder="Senha (mín. 8)" minlength="8" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-aluno">Cadastrar</button>
           </article>
           <article class="card">
             <h3>Novo professor</h3>
-            <input type="text" id="dir-pr-nome" placeholder="Nome" />
+            <input type="text" id="dir-pr-nome" placeholder="Nome completo" />
             <input type="text" id="dir-pr-cpf" placeholder="CPF" />
             <input type="text" id="dir-pr-disc" placeholder="Disciplina" />
-            <input type="text" id="dir-pr-user" placeholder="Login (XML)" />
-            <input type="password" id="dir-pr-pass" placeholder="Senha" />
+            <input type="email" id="dir-pr-email" placeholder="E-mail do professor" />
+            <input type="password" id="dir-pr-pass" placeholder="Senha (mín. 8)" minlength="8" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-prof">Cadastrar</button>
           </article>
           <article class="card">
-            <h3>Vincular professor</h3>
-            <input type="text" id="dir-vinc-prof" placeholder="Nome do professor" />
-            <input type="text" id="dir-vinc-turma" placeholder="Turma" />
+            <h3>Vincular professor à turma</h3>
+            <input type="text" id="dir-vinc-prof" placeholder="E-mail do professor" />
+            <input type="text" id="dir-vinc-turma" placeholder="Nome da turma" />
             <button type="button" class="btn-primary btn-sm" data-acao="vincular">Vincular</button>
           </article>
           <article class="card">
             <h3>Editar notas / faltas</h3>
-            <input type="text" id="dir-nf-aluno" placeholder="Nome do aluno" />
-            <input type="number" id="dir-nf-nota" placeholder="Nota" step="0.1" />
-            <input type="number" id="dir-nf-faltas" placeholder="Faltas" />
+            <input type="email" id="dir-nf-email" placeholder="E-mail do aluno" />
+            <input type="number" id="dir-nf-nota" placeholder="Nota" step="0.1" min="0" max="10" />
+            <input type="number" id="dir-nf-faltas" placeholder="Faltas" min="0" />
             <button type="button" class="btn-primary btn-sm" data-acao="edit-nf">Salvar</button>
           </article>
         </div>
         <section class="card card-wide">
           <div class="card-head">
-            <h3>Todas as turmas</h3>
+            <h3>Todas as turmas — Jardim das Acácias</h3>
             <button type="button" class="btn-ghost btn-sm" data-acao="refresh-turmas">Atualizar</button>
           </div>
           <div id="dir-lista-turmas" class="lista-turmas"></div>
         </section>
       </section>
 
-      <!-- Professor -->
       <section id="painel-professor" class="painel" hidden>
         <h2>Painel do Professor</h2>
-        <div id="prof-sem-turma" class="alert" hidden>
-          Você ainda não possui turma vinculada pelo diretor.
-        </div>
+        <div id="prof-sem-turma" class="alert" hidden></div>
         <div id="prof-conteudo" hidden>
           <div class="grid-cards">
             <article class="card">
               <h3>Lançar nota</h3>
-              <input type="text" id="pr-nota-aluno" placeholder="Nome do aluno" />
-              <input type="number" id="pr-nota-valor" placeholder="Nota" step="0.1" />
+              <select id="pr-nota-aluno" class="select-full"></select>
+              <input type="number" id="pr-nota-valor" placeholder="Nota" step="0.1" min="0" max="10" />
               <button type="button" class="btn-primary btn-sm" data-acao="lancar-nota">Lançar</button>
             </article>
             <article class="card">
               <h3>Registrar falta</h3>
-              <input type="text" id="pr-falta-aluno" placeholder="Nome do aluno" />
+              <select id="pr-falta-aluno" class="select-full"></select>
               <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar</button>
             </article>
           </div>
@@ -154,9 +151,9 @@
         </div>
       </section>
 
-      <!-- Aluno -->
       <section id="painel-aluno" class="painel" hidden>
         <h2>Minhas informações</h2>
+        <p class="login-sub">Colégio Jardim das Acácias — consulta somente leitura</p>
         <div id="aluno-card" class="card aluno-resumo"></div>
       </section>
     </main>
@@ -164,6 +161,7 @@
     <p id="toast" class="toast" hidden></p>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>
