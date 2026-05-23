@@ -42,11 +42,13 @@ node scripts/setup-supabase.mjs
 
 Isso cria:
 
-| Perfil | E-mail | Senha |
-|--------|--------|-------|
-| Diretor | diretor@acacias.edu.br | `Acacias@2025` |
-| Professor | danton@acacias.edu.br | `Acacias@2025` |
-| Aluno | pedro@acacias.edu.br | `Acacias@2025` |
+| Perfil | Usuário | Senha |
+|--------|---------|-------|
+| Diretor | `diretor1` | `diretor123` |
+| Professor | `profesor2` | `profesor23` |
+| Aluno | `alunos123` | `alunos123` |
+
+No portal web, digite só o **usuário** (ex: `diretor1`) — o sistema completa `@acacias.edu.br` automaticamente.
 
 Escola fictícia: **Colégio Jardim das Acácias**
 
