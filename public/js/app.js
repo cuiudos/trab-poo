@@ -35,6 +35,13 @@ async function adminPost(path, body) {
   return res.json();
 }
 
+async function ensureSupabase() {
+  if (!supabaseClient) await initSupabase();
+  if (!supabaseClient) {
+    throw new Error("Supabase não inicializado. Verifique as variáveis na Vercel.");
+  }
+}
+
 async function initSupabase() {
   const res = await fetch("/api/env");
   const env = await res.json();
@@ -74,6 +81,7 @@ $("#form-login").addEventListener("submit", async (e) => {
   btn.textContent = "Entrando…";
 
   try {
+    await ensureSupabase();
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email: loginParaEmail($("#email").value),
       password: $("#senha").value,
@@ -91,7 +99,7 @@ $("#form-login").addEventListener("submit", async (e) => {
     sessaoAtual = data.session;
     userId = data.user.id;
 
-    const { data: perfil, error: perfilErr } = await supabase
+    const { data: perfil, error: perfilErr } = await supabaseClient
       .from("perfis")
       .select("nome, role, escola_id")
       .eq("id", userId)
@@ -99,7 +107,7 @@ $("#form-login").addEventListener("submit", async (e) => {
 
     if (perfilErr || !perfil) {
       await supabaseClient.auth.signOut();
-      erro.textContent = "Perfil não cadastrado. Execute scripts/setup-supabaseClient.mjs";
+      erro.textContent = "Perfil não cadastrado. Execute: node scripts/setup-supabase.mjs";
       erro.hidden = false;
       return;
     }
@@ -123,7 +131,7 @@ $("#form-login").addEventListener("submit", async (e) => {
 });
 
 $("#btn-sair").addEventListener("click", async () => {
-  await supabaseClient.auth.signOut();
+  if (supabaseClient) await supabaseClient.auth.signOut();
   sessaoAtual = null;
   $("#app").hidden = true;
   $("#tela-login").hidden = false;
@@ -150,13 +158,14 @@ function mostrarApp(sessao) {
 }
 
 async function verificarSessao() {
+  if (!supabaseClient) return;
   const { data } = await supabaseClient.auth.getSession();
   if (!data.session) return;
 
   sessaoAtual = data.session;
   userId = data.session.user.id;
 
-  const { data: perfil } = await supabase
+  const { data: perfil } = await supabaseClient
     .from("perfis")
     .select("nome, role, escola_id")
     .eq("id", userId)
@@ -170,7 +179,7 @@ async function verificarSessao() {
 }
 
 async function listarTurmasCompletas() {
-  const { data: turmas, error: turmaErr } = await supabase
+  const { data: turmas, error: turmaErr } = await supabaseClient
     .from("turmas")
     .select("id, nome, professor_id")
     .eq("escola_id", escolaId)
@@ -183,7 +192,7 @@ async function listarTurmasCompletas() {
   for (const t of turmas || []) {
     let professorNome = null;
     if (t.professor_id) {
-      const { data: prof } = await supabase
+      const { data: prof } = await supabaseClient
         .from("perfis")
         .select("nome")
         .eq("id", t.professor_id)
@@ -191,14 +200,14 @@ async function listarTurmasCompletas() {
       professorNome = prof?.nome;
     }
 
-    const { data: registros } = await supabase
+    const { data: registros } = await supabaseClient
       .from("registros_alunos")
       .select("id, nota, faltas, perfil_id")
       .eq("turma_id", t.id);
 
     const alunos = [];
     for (const r of registros || []) {
-      const { data: p } = await supabase
+      const { data: p } = await supabaseClient
         .from("perfis")
         .select("nome, cpf")
         .eq("id", r.perfil_id)
@@ -266,7 +275,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
 
   try {
     if (acao === "cad-turma") {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("turmas")
         .insert({ escola_id: escolaId, nome: $("#dir-turma-nome").value.trim() });
       if (error) throw error;
@@ -297,7 +306,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
       const profId = await buscarIdPorEmail($("#dir-vinc-prof").value);
       if (!profId) throw new Error("Professor não encontrado.");
 
-      const { data: turma } = await supabase
+      const { data: turma } = await supabaseClient
         .from("turmas")
         .select("id")
         .eq("escola_id", escolaId)
@@ -334,7 +343,7 @@ async function carregarTurmaProfessor() {
   const sem = $("#prof-sem-turma");
   const cont = $("#prof-conteudo");
 
-  const { data: turma, error } = await supabase
+  const { data: turma, error } = await supabaseClient
     .from("turmas")
     .select("id, nome")
     .eq("professor_id", userId)
@@ -364,19 +373,19 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
     const registroId = acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
 
     if (acao === "lancar-nota") {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("registros_alunos")
         .update({ nota: parseFloat($("#pr-nota-valor").value) })
         .eq("id", registroId);
       if (error) throw error;
       toast("Nota lançada!");
     } else if (acao === "lancar-falta") {
-      const { data: reg } = await supabase
+      const { data: reg } = await supabaseClient
         .from("registros_alunos")
         .select("faltas")
         .eq("id", registroId)
         .single();
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from("registros_alunos")
         .update({ faltas: (reg?.faltas || 0) + 1 })
         .eq("id", registroId);
@@ -391,7 +400,7 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 
 async function carregarDadosAluno() {
   const card = $("#aluno-card");
-  const { data: reg, error } = await supabase
+  const { data: reg, error } = await supabaseClient
     .from("registros_alunos")
     .select("nota, faltas, turma:turmas(nome)")
     .eq("perfil_id", userId)
