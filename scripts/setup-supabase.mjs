@@ -1,12 +1,27 @@
 /**
  * Cria usuários de teste no Supabase Auth + perfis.
  * Logins: diretor1, profesor2, alunos123
+ *
+ * Se der "fetch failed" no Windows, use:
+ *   npm run setup
+ * ou:
+ *   .\scripts\setup-supabase.ps1
  */
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, existsSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+
+async function configurarSslWindows() {
+  if (process.env.SUPABASE_INSECURE_SSL === "1") {
+    const { Agent, setGlobalDispatcher } = await import("undici");
+    setGlobalDispatcher(new Agent({ connect: { rejectUnauthorized: false } }));
+    console.warn("⚠ SSL verification disabled (SUPABASE_INSECURE_SSL=1)");
+  }
+}
+
+await configurarSslWindows();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
