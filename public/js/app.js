@@ -1,6 +1,6 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm";
+const { createClient } = supabase;
 
-let supabase = null;
+let supabaseClient = null;
 let sessaoAtual = null;
 let perfilAtual = "diretor";
 let escolaId = null;
@@ -39,7 +39,7 @@ async function initSupabase() {
   const res = await fetch("/api/env");
   const env = await res.json();
   if (!env.ok) throw new Error(env.mensagem || "Configure Supabase na Vercel.");
-  supabase = createClient(env.url, env.anonKey, {
+  supabaseClient = createClient(env.url, env.anonKey, {
     auth: { persistSession: true, autoRefreshToken: true },
   });
 }
@@ -74,7 +74,7 @@ $("#form-login").addEventListener("submit", async (e) => {
   btn.textContent = "Entrando…";
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
       email: loginParaEmail($("#email").value),
       password: $("#senha").value,
     });
@@ -98,14 +98,14 @@ $("#form-login").addEventListener("submit", async (e) => {
       .single();
 
     if (perfilErr || !perfil) {
-      await supabase.auth.signOut();
-      erro.textContent = "Perfil não cadastrado. Execute scripts/setup-supabase.mjs";
+      await supabaseClient.auth.signOut();
+      erro.textContent = "Perfil não cadastrado. Execute scripts/setup-supabaseClient.mjs";
       erro.hidden = false;
       return;
     }
 
     if (perfil.role !== perfilAtual) {
-      await supabase.auth.signOut();
+      await supabaseClient.auth.signOut();
       erro.textContent = `Selecione a aba "${perfil.role}" para este e-mail.`;
       erro.hidden = false;
       return;
@@ -123,7 +123,7 @@ $("#form-login").addEventListener("submit", async (e) => {
 });
 
 $("#btn-sair").addEventListener("click", async () => {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   sessaoAtual = null;
   $("#app").hidden = true;
   $("#tela-login").hidden = false;
@@ -150,7 +150,7 @@ function mostrarApp(sessao) {
 }
 
 async function verificarSessao() {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await supabaseClient.auth.getSession();
   if (!data.session) return;
 
   sessaoAtual = data.session;
@@ -306,7 +306,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
 
       if (!turma) throw new Error("Turma não encontrada.");
 
-      const { error } = await supabase.from("turmas").update({ professor_id: profId }).eq("id", turma.id);
+      const { error } = await supabaseClient.from("turmas").update({ professor_id: profId }).eq("id", turma.id);
       if (error) throw error;
       toast("Professor vinculado!");
     } else if (acao === "edit-nf") {
@@ -317,7 +317,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
       if ($("#dir-nf-nota").value !== "") upd.nota = parseFloat($("#dir-nf-nota").value);
       if ($("#dir-nf-faltas").value !== "") upd.faltas = parseInt($("#dir-nf-faltas").value, 10);
 
-      const { error } = await supabase.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
+      const { error } = await supabaseClient.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
       if (error) throw error;
       toast("Dados atualizados!");
     } else if (acao === "refresh-turmas") {
@@ -402,7 +402,7 @@ async function carregarDadosAluno() {
     return;
   }
 
-  const { data: perfil } = await supabase.from("perfis").select("nome, cpf").eq("id", userId).single();
+  const { data: perfil } = await supabaseClient.from("perfis").select("nome, cpf").eq("id", userId).single();
 
   card.innerHTML = `
     <p><strong>Escola:</strong> Colégio Jardim das Acácias</p>
