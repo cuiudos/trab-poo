@@ -1,6 +1,10 @@
-# Sistema de Gerenciamento Escolar
+# Sistema de Gerenciamento Escolar — Colégio Jardim das Acácias
 
-Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno) com `usuarios.xml`.
+Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno).
+
+**Produção (Vercel):** login seguro com [Supabase](https://supabase.com) — veja [SUPABASE.md](./SUPABASE.md).
+
+**Console (.NET):** ainda usa `usuarios.xml` localmente.
 
 ## Estrutura
 
@@ -11,7 +15,15 @@ Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno) com `usuari
 | `public/` + `api/` | Versão para **Vercel** (navegador + API Node.js) |
 | `data/` | `usuarios.xml` e dados iniciais da escola |
 
-## Login (teste)
+## Login web (Supabase)
+
+| Perfil | E-mail | Senha (após setup) |
+|--------|--------|---------------------|
+| Diretor | `diretor@acacias.edu.br` | `Acacias@2025` |
+| Professor | `danton@acacias.edu.br` | `Acacias@2025` |
+| Aluno | `pedro@acacias.edu.br` | `Acacias@2025` |
+
+## Login console (XML local)
 
 | Perfil | Usuário | Senha |
 |--------|---------|-------|
