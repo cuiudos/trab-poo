@@ -1,12 +1,3 @@
-/**
- * Cria usuários de teste no Supabase Auth + perfis.
- * Logins: diretor1, professor2, alunos123
- *
- * Se der "fetch failed" no Windows, use:
- *   npm run setup
- * ou:
- *   .\scripts\setup-supabase.ps1
- */
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, existsSync } from "fs";
