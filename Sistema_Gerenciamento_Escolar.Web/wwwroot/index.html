@@ -143,7 +143,8 @@
               <h3>Lançar nota</h3>
               <select id="pr-nota-aluno" class="select-full"></select>
               <select id="pr-nota-disciplina" class="select-full"></select>
-              <input type="number" id="pr-nota-valor" placeholder="Nota (0 a 100)" step="0.1" min="0" max="100" />
+              <input type="number" id="pr-nota-valor-atv" class="select-full" placeholder="Valor da atividade (1 a 100)" step="0.1" min="1" max="100" value="10" />
+              <input type="number" id="pr-nota-valor" placeholder="Nota do aluno (0 a 10)" step="0.1" min="0" max="10" />
               <input type="text" id="pr-nota-desc" class="select-full" placeholder="Descrição (ex: Prova 1, Trabalho)" maxlength="120" />
               <button type="button" class="btn-primary btn-sm" data-acao="lancar-nota">Lançar</button>
             </article>
@@ -206,6 +207,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=9"></script>
+  <script src="/js/app.js?v=10"></script>
 </body>
 </html>

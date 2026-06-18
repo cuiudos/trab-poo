@@ -240,10 +240,20 @@ function formatNotasHtml(notas) {
   if (!notas?.length) return "—";
   return notas
     .map((n) => {
+      const max = n.valorAtividade ?? 100;
       const desc = n.descricao ? ` — ${escapeHtml(n.descricao)}` : "";
-      return `<div class="nota-item"><strong>${escapeHtml(n.disciplina)}</strong>: ${n.nota}${desc}</div>`;
+      return `<div class="nota-item"><strong>${escapeHtml(n.disciplina)}</strong>: ${n.nota} / ${max}${desc}</div>`;
     })
     .join("");
+}
+
+function atualizarMaxNotaAluno() {
+  const atv = parseFloat($("#pr-nota-valor-atv")?.value);
+  const inputNota = $("#pr-nota-valor");
+  if (!inputNota) return;
+  const max = Number.isNaN(atv) || atv <= 0 ? 100 : Math.min(atv, 100);
+  inputNota.max = max;
+  inputNota.placeholder = `Nota do aluno (0 a ${max})`;
 }
 
 function popularSelectDisciplinas(disciplinas) {
@@ -285,7 +295,7 @@ function invalidarCacheUsuarios() {
 
 async function buscarRegistrosTurma(turmaId) {
   const comNotas =
-    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, nota, descricao, created_at)";
+    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, valor_atividade, nota, descricao, created_at)";
   const semNotas = "id, faltas, perfil_id, perfil:perfis(nome, cpf)";
 
   let result = await supabaseClient.from("registros_alunos").select(comNotas).eq("turma_id", turmaId);
@@ -309,6 +319,7 @@ function mapRegistrosParaAlunos(registros) {
     const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
     const notas = (r.notas_disciplinas || []).map((n) => ({
       disciplina: n.disciplina,
+      valorAtividade: n.valor_atividade,
       nota: n.nota,
       descricao: n.descricao,
     }));
@@ -752,7 +763,13 @@ async function carregarTurmaProfessor() {
     turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
   popularSelectDisciplinas(disciplinasProfessor);
+  atualizarMaxNotaAluno();
   renderTurmas($("#prof-lista-alunos"), turmas, true);
+}
+
+const prNotaValorAtv = $("#pr-nota-valor-atv");
+if (prNotaValorAtv) {
+  prNotaValorAtv.addEventListener("input", atualizarMaxNotaAluno);
 }
 
 document.querySelector("#painel-professor").addEventListener("click", async (e) => {
@@ -765,16 +782,25 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 
     if (acao === "lancar-nota") {
       const notaVal = $("#pr-nota-valor").value;
+      const valorAtvVal = $("#pr-nota-valor-atv").value;
       const disciplina = $("#pr-nota-disciplina").value;
       const descricao = $("#pr-nota-desc").value.trim();
       if (!disciplina) throw new Error("Selecione a disciplina.");
-      if (notaVal === "") throw new Error("Informe a nota.");
+      if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
+      if (notaVal === "") throw new Error("Informe a nota do aluno.");
+      const valorAtividade = parseFloat(valorAtvVal);
       const nota = parseFloat(notaVal);
-      if (Number.isNaN(nota) || nota < 0 || nota > 100) throw new Error("Nota deve ser entre 0 e 100.");
+      if (Number.isNaN(valorAtividade) || valorAtividade <= 0 || valorAtividade > 100) {
+        throw new Error("Valor da atividade deve ser entre 1 e 100.");
+      }
+      if (Number.isNaN(nota) || nota < 0 || nota > valorAtividade) {
+        throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
+      }
 
       const r = await adminPost("/api/professor/lancar-nota", {
         registroId,
         disciplina,
+        valorAtividade,
         nota,
         descricao,
       });
@@ -808,7 +834,7 @@ async function carregarDadosAluno() {
 
   const comNotas = await supabaseClient
     .from("registros_alunos")
-    .select("faltas, turma:turmas(nome), notas_disciplinas(disciplina, nota, descricao)")
+    .select("faltas, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao)")
     .eq("perfil_id", userId)
     .maybeSingle();
 
@@ -839,6 +865,7 @@ async function carregarDadosAluno() {
 
   const notas = (reg.notas_disciplinas || []).map((n) => ({
     disciplina: n.disciplina,
+    valorAtividade: n.valor_atividade,
     nota: n.nota,
     descricao: n.descricao,
   }));

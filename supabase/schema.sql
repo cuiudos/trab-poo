@@ -56,7 +56,8 @@ create table if not exists public.notas_disciplinas (
   id uuid primary key default gen_random_uuid(),
   registro_aluno_id uuid not null references public.registros_alunos (id) on delete cascade,
   disciplina text not null,
-  nota numeric(5, 1) not null check (nota >= 0 and nota <= 100),
+  valor_atividade numeric(5, 1) not null default 10 check (valor_atividade > 0 and valor_atividade <= 100),
+  nota numeric(5, 1) not null check (nota >= 0),
   descricao text,
   professor_id uuid not null references public.perfis (id) on delete cascade,
   created_at timestamptz not null default now()

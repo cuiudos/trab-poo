@@ -27,17 +27,28 @@ module.exports = async (req, res) => {
 
   const userId = userData.user.id;
   const body = await parseBody(req);
-  const { registroId, disciplina, nota, descricao } = body;
+  const { registroId, disciplina, nota, descricao, valorAtividade } = body;
 
   if (!registroId) return res.status(400).json({ ok: false, mensagem: "Aluno é obrigatório." });
   if (!disciplina?.trim()) return res.status(400).json({ ok: false, mensagem: "Disciplina é obrigatória." });
+  if (valorAtividade === undefined || valorAtividade === null || valorAtividade === "") {
+    return res.status(400).json({ ok: false, mensagem: "Valor da atividade é obrigatório." });
+  }
   if (nota === undefined || nota === null || nota === "") {
-    return res.status(400).json({ ok: false, mensagem: "Nota é obrigatória." });
+    return res.status(400).json({ ok: false, mensagem: "Nota do aluno é obrigatória." });
+  }
+
+  const valorAtvNum = parseFloat(valorAtividade);
+  if (Number.isNaN(valorAtvNum) || valorAtvNum <= 0 || valorAtvNum > 100) {
+    return res.status(400).json({ ok: false, mensagem: "Valor da atividade deve ser entre 1 e 100." });
   }
 
   const notaNum = parseFloat(nota);
-  if (Number.isNaN(notaNum) || notaNum < 0 || notaNum > 100) {
-    return res.status(400).json({ ok: false, mensagem: "Nota deve ser entre 0 e 100." });
+  if (Number.isNaN(notaNum) || notaNum < 0 || notaNum > valorAtvNum) {
+    return res.status(400).json({
+      ok: false,
+      mensagem: `Nota do aluno deve ser entre 0 e ${valorAtvNum} (valor da atividade).`,
+    });
   }
 
   const { data: perfil, error: perfilErr } = await admin
@@ -80,16 +91,17 @@ module.exports = async (req, res) => {
   const { error: insertErr } = await admin.from("notas_disciplinas").insert({
     registro_aluno_id: registroId,
     disciplina: discCanon,
+    valor_atividade: valorAtvNum,
     nota: notaNum,
     descricao: descricao?.trim() || null,
     professor_id: userId,
   });
 
   if (insertErr) {
-    if (insertErr.message?.includes("notas_disciplinas")) {
+    if (insertErr.message?.includes("notas_disciplinas") || insertErr.message?.includes("valor_atividade")) {
       return res.status(400).json({
         ok: false,
-        mensagem: "Execute supabase/migracao-notas-disciplinas.sql no Supabase.",
+        mensagem: "Execute supabase/migracao-notas-valor-atividade.sql no Supabase.",
       });
     }
     return res.status(400).json({ ok: false, mensagem: insertErr.message });
@@ -97,6 +109,6 @@ module.exports = async (req, res) => {
 
   res.json({
     ok: true,
-    mensagem: `Nota ${notaNum} lançada em ${discCanon}${descricao?.trim() ? ` (${descricao.trim()})` : ""}.`,
+    mensagem: `Nota ${notaNum}/${valorAtvNum} lançada em ${discCanon}${descricao?.trim() ? ` (${descricao.trim()})` : ""}.`,
   });
 };

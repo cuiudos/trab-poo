@@ -6,6 +6,7 @@ function mapNotas(notas) {
     id: n.id,
     disciplina: n.disciplina,
     nota: n.nota,
+    valorAtividade: n.valor_atividade,
     descricao: n.descricao,
     createdAt: n.created_at,
   }));
@@ -15,7 +16,7 @@ async function buscarRegistrosTurma(admin, turmaId) {
   const comNotas = `
     id, faltas, perfil_id,
     perfil:perfis(nome, cpf),
-    notas_disciplinas(id, disciplina, nota, descricao, created_at)
+    notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at)
   `;
   const semNotas = `
     id, faltas, perfil_id,
