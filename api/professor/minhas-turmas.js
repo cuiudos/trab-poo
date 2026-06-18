@@ -12,27 +12,51 @@ function mapNotas(notas) {
   }));
 }
 
+function mapFaltas(faltas) {
+  const obj = {};
+  for (const f of faltas || []) {
+    obj[f.disciplina] = f.faltas;
+  }
+  return obj;
+}
+
+function mapAulas(aulas) {
+  const obj = {};
+  for (const a of aulas || []) {
+    obj[a.disciplina] = a.total_aulas;
+  }
+  return obj;
+}
+
 async function buscarRegistrosTurma(admin, turmaId) {
-  const comNotas = `
+  const completo = `
+    id, faltas, perfil_id,
+    perfil:perfis(nome, cpf),
+    notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at),
+    faltas_disciplinas(disciplina, faltas)
+  `;
+  const semFaltas = `
     id, faltas, perfil_id,
     perfil:perfis(nome, cpf),
     notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at)
   `;
-  const semNotas = `
+  const basico = `
     id, faltas, perfil_id,
     perfil:perfis(nome, cpf)
   `;
 
-  let result = await admin.from("registros_alunos").select(comNotas).eq("turma_id", turmaId);
+  let result = await admin.from("registros_alunos").select(completo).eq("turma_id", turmaId);
 
   if (result.error) {
     const msg = result.error.message || "";
-    const semTabelaNotas =
-      msg.includes("notas_disciplinas") ||
-      msg.includes("relationship") ||
-      result.error.code === "PGRST200";
-    if (semTabelaNotas) {
-      result = await admin.from("registros_alunos").select(semNotas).eq("turma_id", turmaId);
+    if (msg.includes("faltas_disciplinas")) {
+      result = await admin.from("registros_alunos").select(semFaltas).eq("turma_id", turmaId);
+    }
+    if (result.error) {
+      const msg2 = result.error.message || "";
+      if (msg2.includes("notas_disciplinas") || result.error.code === "PGRST200") {
+        result = await admin.from("registros_alunos").select(basico).eq("turma_id", turmaId);
+      }
     }
   }
 
@@ -94,6 +118,14 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, mensagem: regErr.message });
     }
 
+    let aulasDisciplinas = {};
+    const { data: aulasRows, error: aulasErr } = await admin
+      .from("aulas_disciplinas")
+      .select("disciplina, total_aulas")
+      .eq("turma_id", t.id);
+
+    if (!aulasErr) aulasDisciplinas = mapAulas(aulasRows);
+
     const alunos = (registros || []).map((r) => {
       const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
       return {
@@ -101,7 +133,7 @@ module.exports = async (req, res) => {
         perfilId: r.perfil_id,
         nome: p?.nome || "Aluno",
         cpf: p?.cpf || "",
-        faltas: r.faltas,
+        faltasDisciplinas: mapFaltas(r.faltas_disciplinas),
         notasDisciplinas: mapNotas(r.notas_disciplinas),
       };
     });
@@ -111,6 +143,7 @@ module.exports = async (req, res) => {
       nome: t.nome,
       professorNome: perfil.nome,
       professorDisciplinas: perfil.disciplina,
+      aulasDisciplinas,
       alunos,
     });
   }

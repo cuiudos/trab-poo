@@ -149,9 +149,20 @@
               <button type="button" class="btn-primary btn-sm" data-acao="lancar-nota">Lançar</button>
             </article>
             <article class="card">
+              <h3>Aulas dadas na disciplina</h3>
+              <p class="meta card-hint">Máx. 25% de faltas por lei (mín. 75% de presença).</p>
+              <div id="pr-aulas-turma-wrap">
+                <select id="pr-aulas-turma" class="select-full"></select>
+              </div>
+              <select id="pr-aulas-disciplina" class="select-full"></select>
+              <input type="number" id="pr-aulas-total" class="select-full" placeholder="Total de aulas dadas" min="1" step="1" />
+              <button type="button" class="btn-primary btn-sm" data-acao="definir-aulas">Salvar aulas</button>
+            </article>
+            <article class="card">
               <h3>Registrar falta</h3>
               <select id="pr-falta-aluno" class="select-full"></select>
-              <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar</button>
+              <select id="pr-falta-disciplina" class="select-full"></select>
+              <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar falta</button>
             </article>
           </div>
           <section class="card card-wide">
@@ -207,6 +218,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=11"></script>
+  <script src="/js/app.js?v=12"></script>
 </body>
 </html>

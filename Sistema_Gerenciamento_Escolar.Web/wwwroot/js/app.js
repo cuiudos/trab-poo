@@ -221,6 +221,7 @@ async function verificarSessao() {
 
 let cacheUsuariosPorId = null;
 let usuariosLista = [];
+let turmasProfessorCache = [];
 
 function listaDisciplinas(valor) {
   if (!valor) return [];
@@ -274,11 +275,73 @@ function formatTotalHtml(notas) {
   return `<strong>${r.percentual}%</strong><br><span class="meta">${r.pontos} / ${r.pontosMax} pts</span>`;
 }
 
-function formatSituacaoHtml(notas) {
-  const r = calcularResultadoFinal(notas);
-  if (!r.situacao) return "—";
-  const cls = r.situacao === "Aprovado" ? "badge-aprovado" : "badge-reprovado";
-  return `<span class="badge-situacao ${cls}">${r.situacao}</span>`;
+function calcularFrequenciaDisciplina(faltas, totalAulas) {
+  const total = Number(totalAulas) || 0;
+  const f = Number(faltas) || 0;
+  if (total <= 0) return null;
+  const limiteFaltas = Math.floor(total * 0.25);
+  const frequencia = Math.round(((total - f) / total) * 1000) / 10;
+  const reprovadoFalta = f > limiteFaltas;
+  return { faltas: f, totalAulas: total, frequencia, limiteFaltas, reprovadoFalta };
+}
+
+function mapFaltasLista(faltas) {
+  const obj = {};
+  for (const f of faltas || []) obj[f.disciplina] = f.faltas;
+  return obj;
+}
+
+function mapAulasLista(aulas) {
+  const obj = {};
+  for (const a of aulas || []) obj[a.disciplina] = a.total_aulas;
+  return obj;
+}
+
+function calcularSituacaoCompleta(notas, faltasDisciplinas, aulasDisciplinas) {
+  const notaRes = calcularResultadoFinal(notas);
+  const frequencias = [];
+  let reprovadoFalta = false;
+
+  for (const disc of Object.keys(aulasDisciplinas || {})) {
+    const total = aulasDisciplinas[disc];
+    if (!total) continue;
+    const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, total);
+    if (calc) {
+      frequencias.push({ disciplina: disc, ...calc });
+      if (calc.reprovadoFalta) reprovadoFalta = true;
+    }
+  }
+
+  let situacaoFinal = null;
+  const passNota = notaRes.percentual === null ? null : notaRes.percentual >= 60;
+
+  if (passNota === false) situacaoFinal = "Reprovado (nota)";
+  else if (reprovadoFalta) situacaoFinal = "Reprovado (falta)";
+  else if (passNota === true) situacaoFinal = "Aprovado";
+  else if (reprovadoFalta) situacaoFinal = "Reprovado (falta)";
+
+  return { ...notaRes, frequencias, reprovadoFalta, situacaoFinal };
+}
+
+function formatFrequenciaHtml(faltasDisciplinas, aulasDisciplinas) {
+  const discs = Object.keys(aulasDisciplinas || {});
+  if (!discs.length) return `<span class="meta">Cadastre as aulas</span>`;
+
+  return discs
+    .map((disc) => {
+      const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, aulasDisciplinas[disc]);
+      if (!calc) return "";
+      const cls = calc.reprovadoFalta ? "freq-reprovado" : "freq-ok";
+      return `<div class="freq-item ${cls}"><strong>${escapeHtml(disc)}</strong>: ${calc.faltas}/${calc.totalAulas} faltas · ${calc.frequencia}%</div>`;
+    })
+    .join("");
+}
+
+function formatSituacaoHtml(notas, faltasDisciplinas, aulasDisciplinas) {
+  const r = calcularSituacaoCompleta(notas, faltasDisciplinas, aulasDisciplinas);
+  if (!r.situacaoFinal) return "—";
+  const cls = r.situacaoFinal.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
+  return `<span class="badge-situacao ${cls}">${r.situacaoFinal}</span>`;
 }
 
 function atualizarMaxNotaAluno() {
@@ -290,16 +353,27 @@ function atualizarMaxNotaAluno() {
   inputNota.placeholder = `Nota do aluno (0 a ${max})`;
 }
 
-function popularSelectDisciplinas(disciplinas) {
-  const sel = $("#pr-nota-disciplina");
+function popularSelectsDisciplinas(disciplinas) {
+  const vazio = !disciplinas?.length
+    ? "<option value=''>Cadastre disciplinas no diretor</option>"
+    : disciplinas.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+
+  for (const id of ["pr-nota-disciplina", "pr-falta-disciplina", "pr-aulas-disciplina"]) {
+    const sel = $(`#${id}`);
+    if (sel) sel.innerHTML = vazio;
+  }
+}
+
+function popularSelectTurmasAulas(turmas) {
+  const sel = $("#pr-aulas-turma");
+  const wrap = $("#pr-aulas-turma-wrap");
   if (!sel) return;
-  if (!disciplinas?.length) {
-    sel.innerHTML = "<option value=''>Cadastre disciplinas no diretor</option>";
+  if (!turmas?.length) {
+    sel.innerHTML = "<option value=''>Sem turma</option>";
     return;
   }
-  sel.innerHTML = disciplinas
-    .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`)
-    .join("");
+  sel.innerHTML = turmas.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join("");
+  if (wrap) wrap.hidden = turmas.length <= 1;
 }
 
 function infoExtraUsuario(u) {
@@ -328,24 +402,37 @@ function invalidarCacheUsuarios() {
 }
 
 async function buscarRegistrosTurma(turmaId) {
-  const comNotas =
+  const completo =
+    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, valor_atividade, nota, descricao, created_at), faltas_disciplinas(disciplina, faltas)";
+  const semFaltas =
     "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, valor_atividade, nota, descricao, created_at)";
   const semNotas = "id, faltas, perfil_id, perfil:perfis(nome, cpf)";
 
-  let result = await supabaseClient.from("registros_alunos").select(comNotas).eq("turma_id", turmaId);
+  let result = await supabaseClient.from("registros_alunos").select(completo).eq("turma_id", turmaId);
 
   if (result.error) {
     const msg = result.error.message || "";
-    const semTabelaNotas =
-      msg.includes("notas_disciplinas") ||
-      msg.includes("relationship") ||
-      result.error.code === "PGRST200";
-    if (semTabelaNotas) {
-      result = await supabaseClient.from("registros_alunos").select(semNotas).eq("turma_id", turmaId);
+    if (msg.includes("faltas_disciplinas")) {
+      result = await supabaseClient.from("registros_alunos").select(semFaltas).eq("turma_id", turmaId);
+    }
+    if (result.error) {
+      const msg2 = result.error.message || "";
+      if (msg2.includes("notas_disciplinas") || result.error.code === "PGRST200") {
+        result = await supabaseClient.from("registros_alunos").select(semNotas).eq("turma_id", turmaId);
+      }
     }
   }
 
   return result;
+}
+
+async function buscarAulasTurma(turmaId) {
+  const { data, error } = await supabaseClient
+    .from("aulas_disciplinas")
+    .select("disciplina, total_aulas")
+    .eq("turma_id", turmaId);
+  if (error) return {};
+  return mapAulasLista(data);
 }
 
 function mapRegistrosParaAlunos(registros) {
@@ -362,7 +449,7 @@ function mapRegistrosParaAlunos(registros) {
       perfilId: r.perfil_id,
       nome: p?.nome || "Aluno",
       cpf: p?.cpf || "",
-      faltas: r.faltas,
+      faltasDisciplinas: mapFaltasLista(r.faltas_disciplinas),
       notasDisciplinas: notas,
     };
   });
@@ -399,6 +486,7 @@ async function listarTurmasCompletas() {
     if (regErr) throw regErr;
 
     const alunos = mapRegistrosParaAlunos(registros);
+    const aulasDisciplinas = await buscarAulasTurma(t.id);
 
     resultado.push({
       id: t.id,
@@ -407,6 +495,7 @@ async function listarTurmasCompletas() {
       professorNome,
       professorLogin: t.professor_id ? usuarios.get(t.professor_id)?.login : null,
       professorDisciplinas: t.professor_id ? usuarios.get(t.professor_id)?.disciplina : null,
+      aulasDisciplinas,
       alunos,
     });
   }
@@ -422,12 +511,19 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
 
   container.innerHTML = turmas
     .map((t) => {
+      const aulas = t.aulasDisciplinas || {};
       const rows = (t.alunos || [])
         .map(
           (a) =>
-            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td class="col-total">${formatTotalHtml(a.notasDisciplinas)}</td><td>${formatSituacaoHtml(a.notasDisciplinas)}</td><td>${a.faltas}</td></tr>`
+            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td class="col-total">${formatTotalHtml(a.notasDisciplinas)}</td><td class="col-freq">${formatFrequenciaHtml(a.faltasDisciplinas, aulas)}</td><td>${formatSituacaoHtml(a.notasDisciplinas, a.faltasDisciplinas, aulas)}</td></tr>`
         )
         .join("");
+
+      const aulasInfo = Object.keys(aulas).length
+        ? `<p class="meta">Aulas dadas: ${Object.entries(aulas)
+            .map(([d, n]) => `${escapeHtml(d)} (${n})`)
+            .join(", ")}</p>`
+        : "";
 
       const profInfo = t.professorNome
         ? t.professorLogin
@@ -451,7 +547,8 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
         </div>
         <p class="meta">Professor: ${profInfo}</p>
         ${discHtml}
-        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas</th><th>Total</th><th>Situação</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
+        ${aulasInfo}
+        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas</th><th>Total</th><th>Frequência</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
     .join("");
@@ -796,7 +893,9 @@ async function carregarTurmaProfessor() {
   $("#prof-turma-titulo").textContent =
     turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
-  popularSelectDisciplinas(disciplinasProfessor);
+  turmasProfessorCache = turmas;
+  popularSelectsDisciplinas(disciplinasProfessor);
+  popularSelectTurmasAulas(turmas);
   atualizarMaxNotaAluno();
   renderTurmas($("#prof-lista-alunos"), turmas, true);
 }
@@ -811,6 +910,21 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
   if (!acao) return;
 
   try {
+    if (acao === "definir-aulas") {
+      const turmaId = $("#pr-aulas-turma").value;
+      const disciplina = $("#pr-aulas-disciplina").value;
+      const totalAulas = $("#pr-aulas-total").value;
+      if (!turmaId) throw new Error("Selecione a turma.");
+      if (!disciplina) throw new Error("Selecione a disciplina.");
+      if (totalAulas === "") throw new Error("Informe o total de aulas dadas.");
+      const r = await adminPost("/api/professor/definir-aulas", { turmaId, disciplina, totalAulas });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar.");
+      toast(r.mensagem || "Aulas cadastradas!");
+      $("#pr-aulas-total").value = "";
+      await carregarTurmaProfessor();
+      return;
+    }
+
     const registroId = acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
     if (!registroId) throw new Error("Selecione um aluno.");
 
@@ -843,17 +957,11 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       $("#pr-nota-valor").value = "";
       $("#pr-nota-desc").value = "";
     } else if (acao === "lancar-falta") {
-      const { data: reg } = await supabaseClient
-        .from("registros_alunos")
-        .select("faltas")
-        .eq("id", registroId)
-        .single();
-      const { error } = await supabaseClient
-        .from("registros_alunos")
-        .update({ faltas: (reg?.faltas || 0) + 1 })
-        .eq("id", registroId);
-      if (error) throw error;
-      toast("Falta registrada!");
+      const disciplina = $("#pr-falta-disciplina").value;
+      if (!disciplina) throw new Error("Selecione a disciplina.");
+      const r = await adminPost("/api/professor/lancar-falta", { registroId, disciplina });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível registrar a falta.");
+      toast(r.mensagem || "Falta registrada!");
     }
     await carregarTurmaProfessor();
   } catch (err) {
@@ -868,21 +976,32 @@ async function carregarDadosAluno() {
 
   const comNotas = await supabaseClient
     .from("registros_alunos")
-    .select("faltas, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao)")
+    .select(
+      "turma_id, faltas, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao), faltas_disciplinas(disciplina, faltas)"
+    )
     .eq("perfil_id", userId)
     .maybeSingle();
 
   if (comNotas.error) {
     const msg = comNotas.error.message || "";
-    const semTabelaNotas = msg.includes("notas_disciplinas") || msg.includes("relationship");
-    if (semTabelaNotas) {
-      const semNotas = await supabaseClient
+    const semFaltas = msg.includes("faltas_disciplinas");
+    const semNotas = msg.includes("notas_disciplinas") || msg.includes("relationship");
+    if (semFaltas) {
+      const r2 = await supabaseClient
         .from("registros_alunos")
-        .select("faltas, turma:turmas(nome)")
+        .select("turma_id, faltas, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao)")
         .eq("perfil_id", userId)
         .maybeSingle();
-      reg = semNotas.data;
-      error = semNotas.error;
+      reg = r2.data;
+      error = r2.error;
+    } else if (semNotas) {
+      const r2 = await supabaseClient
+        .from("registros_alunos")
+        .select("turma_id, faltas, turma:turmas(nome)")
+        .eq("perfil_id", userId)
+        .maybeSingle();
+      reg = r2.data;
+      error = r2.error;
     } else {
       error = comNotas.error;
     }
@@ -904,7 +1023,9 @@ async function carregarDadosAluno() {
     descricao: n.descricao,
   }));
 
-  const resultado = calcularResultadoFinal(notas);
+  const faltasDisciplinas = mapFaltasLista(reg.faltas_disciplinas);
+  const aulasDisciplinas = reg.turma_id ? await buscarAulasTurma(reg.turma_id) : {};
+  const resultado = calcularSituacaoCompleta(notas, faltasDisciplinas, aulasDisciplinas);
 
   card.innerHTML = `
     <p><strong>Escola:</strong> Colégio Jardim das Acácias</p>
@@ -913,17 +1034,19 @@ async function carregarDadosAluno() {
     <p><strong>Turma:</strong> ${escapeHtml(reg.turma?.nome || "")}</p>
     <p><strong>Notas:</strong></p>
     <div class="notas-aluno">${formatNotasHtml(notas)}</div>
-    <p><strong>Total:</strong> ${
+    <p><strong>Total (notas):</strong> ${
       resultado.percentual !== null
         ? `${resultado.percentual}% (${resultado.pontos} / ${resultado.pontosMax} pontos)`
         : "Sem notas lançadas"
     }</p>
-    <p><strong>Situação:</strong> ${
-      resultado.situacao
-        ? `<span class="badge-situacao ${resultado.situacao === "Aprovado" ? "badge-aprovado" : "badge-reprovado"}">${resultado.situacao}</span> <span class="meta">(mínimo 60% para aprovação)</span>`
+    <p><strong>Frequência por disciplina:</strong></p>
+    <div class="notas-aluno">${formatFrequenciaHtml(faltasDisciplinas, aulasDisciplinas)}</div>
+    <p><strong>Situação final:</strong> ${
+      resultado.situacaoFinal
+        ? `<span class="badge-situacao ${resultado.situacaoFinal.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado"}">${resultado.situacaoFinal}</span>`
         : "—"
     }</p>
-    <p><strong>Faltas:</strong> ${reg.faltas}</p>
+    <p class="meta">Aprovação: mínimo 60% nas notas e mínimo 75% de presença (máx. 25% faltas) em cada disciplina.</p>
   `;
 }
 

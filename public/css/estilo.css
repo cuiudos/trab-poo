@@ -362,6 +362,31 @@ body {
   color: #a12828;
 }
 
+.card-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.freq-item {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  padding: 0.1rem 0;
+}
+
+.freq-ok {
+  color: #1e6b3a;
+}
+
+.freq-reprovado {
+  color: #a12828;
+  font-weight: 600;
+}
+
+.col-freq {
+  min-width: 9rem;
+  max-width: 18rem;
+}
+
 .btn-primary:disabled {
   opacity: 0.65;
   cursor: wait;
