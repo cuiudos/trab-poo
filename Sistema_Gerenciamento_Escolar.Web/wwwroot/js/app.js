@@ -1274,71 +1274,97 @@ async function carregarDadosAluno() {
   container.innerHTML = renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado);
 }
 
-function notasPorDisciplina(notas) {
-  const map = {};
-  for (const n of notas || []) {
-    if (!map[n.disciplina]) map[n.disciplina] = { pontos: 0, max: 0 };
-    map[n.disciplina].pontos += Number(n.nota) || 0;
-    map[n.disciplina].max += Number(n.valorAtividade ?? 100) || 0;
-  }
-  return Object.entries(map).map(([disciplina, v]) => ({
-    disciplina,
-    pontos: v.pontos,
-    max: v.max,
-    percentual: v.max > 0 ? Math.round((v.pontos / v.max) * 1000) / 10 : null,
-  }));
-}
-
 function renderBarraDash(percentual, clsExtra = "") {
   const pct = percentual ?? 0;
   const width = Math.min(100, Math.max(0, pct));
   return `<div class="dash-bar ${clsExtra}"><div class="dash-fill" style="width:${width}%"></div></div>`;
 }
 
+function formatNotasDisciplinaHtml(notas, disciplina) {
+  const lista = notasDaDisciplina(notas, disciplina);
+  if (!lista.length) return `<p class="meta dash-vazio">Nenhuma atividade lançada.</p>`;
+  return `<div class="notas-aluno dash-notas-lista">${lista
+    .map((n) => {
+      const max = n.valorAtividade ?? 100;
+      const desc = n.descricao ? ` — ${escapeHtml(n.descricao)}` : "";
+      return `<div class="nota-item">${n.nota} / ${max}${desc}</div>`;
+    })
+    .join("")}</div>`;
+}
+
+function disciplinasDoAluno(notas, faltasDisciplinas, aulasDisciplinas) {
+  const set = new Set();
+  for (const n of notas || []) set.add(n.disciplina);
+  for (const d of Object.keys(aulasDisciplinas || {})) set.add(d);
+  for (const d of Object.keys(faltasDisciplinas || {})) set.add(d);
+  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+function renderBlocoDisciplinaAluno(disc, notas, faltasDisciplinas, aulasDisciplinas) {
+  const notasDisc = notasDaDisciplina(notas, disc);
+  const notaRes = calcularResultadoFinal(notasDisc);
+  const situacao = calcularSituacaoDisciplina(notas, faltasDisciplinas, aulasDisciplinas, disc);
+  const situacaoCls = situacao.situacaoFinal?.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
+  const okNota = notaRes.percentual !== null && notaRes.percentual >= 60;
+
+  const totalAulas = aulasDisciplinas?.[disc];
+  let faltasHtml = `<p class="meta dash-vazio">Aulas não cadastradas.</p>`;
+  if (totalAulas) {
+    const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, totalAulas);
+    if (calc) {
+      const okFalta = !calc.reprovadoFalta;
+      faltasHtml = `
+        <div class="aluno-disc-metric">
+          <div class="dash-disc-head">
+            <span class="dash-label">Faltas</span>
+            <span class="${okFalta ? "dash-ok" : "dash-warn"}">${calc.percentualFaltas}%</span>
+          </div>
+          ${renderBarraDash(calc.percentualFaltas, okFalta ? "dash-bar-faltas-ok" : "dash-bar-faltas-warn")}
+          <span class="meta">${calc.faltas} de ${calc.totalAulas} aulas · máx. 25% (${calc.limiteFaltas} faltas)</span>
+        </div>`;
+    }
+  }
+
+  const notasHtml =
+    notaRes.percentual !== null
+      ? `
+        <div class="aluno-disc-metric">
+          <div class="dash-disc-head">
+            <span class="dash-label">Média</span>
+            <span class="${okNota ? "dash-ok" : "dash-warn"}">${notaRes.percentual}%</span>
+          </div>
+          ${renderBarraDash(notaRes.percentual, okNota ? "dash-bar-ok" : "dash-bar-warn")}
+          <span class="meta">${notaRes.pontos} / ${notaRes.pontosMax} pontos</span>
+        </div>`
+      : `<p class="meta dash-vazio">Sem notas nesta matéria.</p>`;
+
+  return `
+    <article class="card aluno-disc-card">
+      <div class="aluno-disc-head">
+        <h4>${escapeHtml(disc)}</h4>
+        ${
+          situacao.situacaoFinal
+            ? `<span class="badge-situacao ${situacaoCls}">${situacao.situacaoFinal}</span>`
+            : `<span class="meta">—</span>`
+        }
+      </div>
+      <div class="aluno-disc-metrics">${notasHtml}${faltasHtml}</div>
+      <div class="aluno-disc-atividades">
+        <p class="dash-label">Atividades</p>
+        ${formatNotasDisciplinaHtml(notas, disc)}
+      </div>
+    </article>`;
+}
+
 function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado) {
   const situacaoCls = resultado.situacaoFinal?.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
-  const notasDisc = notasPorDisciplina(notas);
-  const discsFaltas = Object.keys(aulasDisciplinas || {});
+  const disciplinas = disciplinasDoAluno(notas, faltasDisciplinas, aulasDisciplinas);
 
-  const notasDiscHtml = notasDisc.length
-    ? notasDisc
-        .map((d) => {
-          const ok = d.percentual !== null && d.percentual >= 60;
-          return `
-          <div class="dash-disc-item">
-            <div class="dash-disc-head">
-              <strong>${escapeHtml(d.disciplina)}</strong>
-              <span class="${ok ? "dash-ok" : "dash-warn"}">${d.percentual ?? "—"}%</span>
-            </div>
-            ${renderBarraDash(d.percentual, ok ? "dash-bar-ok" : "dash-bar-warn")}
-            <span class="meta">${d.pontos} / ${d.max} pontos</span>
-          </div>`;
-        })
+  const blocosDisc = disciplinas.length
+    ? disciplinas
+        .map((disc) => renderBlocoDisciplinaAluno(disc, notas, faltasDisciplinas, aulasDisciplinas))
         .join("")
-    : `<p class="meta dash-vazio">Nenhuma nota lançada ainda.</p>`;
-
-  const faltasDiscHtml = discsFaltas.length
-    ? discsFaltas
-        .map((disc) => {
-          const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, aulasDisciplinas[disc]);
-          if (!calc) return "";
-          const ok = !calc.reprovadoFalta;
-          return `
-          <div class="dash-disc-item">
-            <div class="dash-disc-head">
-              <strong>${escapeHtml(disc)}</strong>
-              <span class="${ok ? "dash-ok" : "dash-warn"}">${calc.percentualFaltas}% faltas</span>
-            </div>
-            ${renderBarraDash(calc.percentualFaltas, ok ? "dash-bar-faltas-ok" : "dash-bar-faltas-warn")}
-            <span class="meta">${calc.faltas} de ${calc.totalAulas} aulas · máx. 25% (${calc.limiteFaltas} faltas)</span>
-          </div>`;
-        })
-        .join("")
-    : `<p class="meta dash-vazio">Aulas ainda não cadastradas pelo professor.</p>`;
-
-  const notasListaHtml = notas.length
-    ? `<div class="notas-aluno dash-notas-lista">${formatNotasHtml(notas)}</div>`
-    : `<p class="meta dash-vazio">Sem lançamentos.</p>`;
+    : `<p class="meta dash-vazio">Nenhuma matéria cadastrada ainda.</p>`;
 
   return `
     <div class="aluno-dashboard-grid">
@@ -1369,20 +1395,10 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
         <p class="meta dash-meta">Mín. 60% nas notas e máx. 25% de faltas por disciplina.</p>
       </article>
 
-      <article class="card dash-panel-wide">
-        <h3>Desempenho por disciplina</h3>
-        <div class="dash-disc-grid">${notasDiscHtml}</div>
-      </article>
-
-      <article class="card dash-panel-wide">
-        <h3>Faltas por disciplina</h3>
-        <div class="dash-disc-grid">${faltasDiscHtml}</div>
-      </article>
-
-      <article class="card dash-panel-wide">
-        <h3>Detalhamento das notas</h3>
-        ${notasListaHtml}
-      </article>
+      <section class="card dash-panel-wide aluno-materias-section">
+        <h3>Minhas matérias</h3>
+        <div class="aluno-disciplinas-grid">${blocosDisc}</div>
+      </section>
     </div>`;
 }
 
