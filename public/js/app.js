@@ -32,7 +32,12 @@ async function adminPost(path, body) {
     headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const text = await res.text();
+  try {
+    return { status: res.status, ...JSON.parse(text) };
+  } catch {
+    return { ok: false, status: res.status, mensagem: "Servidor indisponível." };
+  }
 }
 
 async function ensureSupabase() {
@@ -476,159 +481,171 @@ async function carregarTurmasDiretor() {
   }
 }
 
-document.querySelector("#painel-diretor").addEventListener("click", async (e) => {
-  const acao = e.target.dataset?.acao;
-  if (!acao) return;
+async function executarAcaoDiretor(acao, e) {
+  if (acao === "editar-usuario") {
+    const u = usuariosLista.find((x) => x.id === e.target.dataset.userId);
+    if (u) abrirModalEditar(u);
+    return;
+  }
 
-  try {
-    if (acao === "editar-usuario") {
-      const u = usuariosLista.find((x) => x.id === e.target.dataset.userId);
-      if (u) abrirModalEditar(u);
-      return;
-    }
-
-    if (acao === "excluir-usuario") {
-      const id = e.target.dataset.userId;
-      const nome = e.target.dataset.userNome;
-      if (!confirm(`Excluir o usuário "${nome}"? Esta ação não pode ser desfeita.`)) return;
-      const r = await adminPost("/api/admin/excluir-usuario", { id });
-      if (!r.ok) throw new Error(r.mensagem);
-      invalidarCacheUsuarios();
-      toast(r.mensagem);
-      await carregarUsuariosDiretor();
-      await carregarTurmasDiretor();
-      return;
-    }
-
-    if (acao === "excluir-turma") {
-      const turmaId = e.target.dataset.turmaId;
-      const turmaNome = e.target.dataset.turmaNome;
-      if (!confirm(`Excluir a turma "${turmaNome}"? Alunos serão desvinculados.`)) return;
-
-      const r = await adminPost("/api/admin/excluir-turma", { id: turmaId });
-      if (!r.ok) {
-        const { data, error } = await supabaseClient
-          .from("turmas")
-          .delete()
-          .eq("id", turmaId)
-          .eq("escola_id", escolaId)
-          .select("id");
-        if (error) throw error;
-        if (!data?.length) {
-          throw new Error(
-            "Sem permissão para excluir. Atualize o site na Vercel ou execute supabase/migracao-policies-delete.sql no Supabase."
-          );
-        }
-        toast("Turma excluída!");
-      } else {
-        toast(r.mensagem);
-      }
-
-      invalidarCacheUsuarios();
-      await carregarTurmasDiretor();
-      return;
-    }
-
-    if (acao === "fechar-modal") {
-      fecharModalEditar();
-      return;
-    }
-
-    if (acao === "salvar-edicao") {
-      const id = $("#edit-user-id").value;
-      const role = $("#edit-user-role").value;
-      const body = {
-        id,
-        nome: $("#edit-nome").value,
-        cpf: $("#edit-cpf").value,
-      };
-      if (role === "professor") body.disciplina = $("#edit-disciplinas").value;
-      if (role === "aluno") body.turmaNome = $("#edit-turma").value;
-      const senha = $("#edit-senha").value;
-      if (senha) body.password = senha;
-      const r = await adminPost("/api/admin/editar-usuario", body);
-      if (!r.ok) throw new Error(r.mensagem);
-      invalidarCacheUsuarios();
-      fecharModalEditar();
-      toast(r.mensagem);
-      await carregarUsuariosDiretor();
-      await carregarTurmasDiretor();
-      return;
-    }
-
-    if (acao === "cad-turma") {
-      const { error } = await supabaseClient
-        .from("turmas")
-        .insert({ escola_id: escolaId, nome: $("#dir-turma-nome").value.trim() });
-      if (error) throw error;
-      toast("Turma cadastrada!");
-    } else if (acao === "cad-aluno") {
-      const r = await adminPost("/api/admin/criar-usuario", {
-        email: $("#dir-al-email").value,
-        password: $("#dir-al-pass").value,
-        nome: $("#dir-al-nome").value,
-        cpf: $("#dir-al-cpf").value,
-        role: "aluno",
-        turmaNome: $("#dir-al-turma").value,
-      });
-      if (!r.ok) throw new Error(r.mensagem);
-      invalidarCacheUsuarios();
-      toast(r.mensagem);
-    } else if (acao === "cad-prof") {
-      const r = await adminPost("/api/admin/criar-usuario", {
-        email: $("#dir-pr-email").value,
-        password: $("#dir-pr-pass").value,
-        nome: $("#dir-pr-nome").value,
-        cpf: $("#dir-pr-cpf").value,
-        role: "professor",
-        disciplina: $("#dir-pr-disc").value,
-      });
-      if (!r.ok) throw new Error(r.mensagem);
-      invalidarCacheUsuarios();
-      toast(r.mensagem);
-    } else if (acao === "vincular") {
-      const profId = await buscarIdPorEmail($("#dir-vinc-prof").value);
-      if (!profId) throw new Error("Professor não encontrado.");
-
-      const { data: turma } = await supabaseClient
-        .from("turmas")
-        .select("id")
-        .eq("escola_id", escolaId)
-        .eq("nome", $("#dir-vinc-turma").value.trim())
-        .maybeSingle();
-
-      if (!turma) throw new Error("Turma não encontrada.");
-
-      const { error } = await supabaseClient.from("turmas").update({ professor_id: profId }).eq("id", turma.id);
-      if (error) throw error;
-      invalidarCacheUsuarios();
-      const usuarios = await obterUsuariosPorId();
-      const prof = usuarios.get(profId);
-      toast(`Professor vinculado! Login: ${prof?.login || $("#dir-vinc-prof").value.trim()}`);
-    } else if (acao === "edit-nf") {
-      const alunoId = await buscarIdPorEmail($("#dir-nf-email").value);
-      if (!alunoId) throw new Error("Aluno não encontrado.");
-
-      const upd = {};
-      if ($("#dir-nf-nota").value !== "") upd.nota = parseFloat($("#dir-nf-nota").value);
-      if ($("#dir-nf-faltas").value !== "") upd.faltas = parseInt($("#dir-nf-faltas").value, 10);
-
-      const { error } = await supabaseClient.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
-      if (error) throw error;
-      toast("Dados atualizados!");
-    } else if (acao === "refresh-turmas") {
-      await carregarTurmasDiretor();
-      return;
-    } else if (acao === "refresh-usuarios") {
-      await carregarUsuariosDiretor();
-      return;
-    }
+  if (acao === "excluir-usuario") {
+    const id = e.target.dataset.userId;
+    const nome = e.target.dataset.userNome;
+    if (!confirm(`Excluir o usuário "${nome}"? Esta ação não pode ser desfeita.`)) return;
+    const r = await adminPost("/api/admin/excluir-usuario", { id });
+    if (!r.ok) throw new Error(r.mensagem);
+    invalidarCacheUsuarios();
+    toast(r.mensagem);
     await carregarUsuariosDiretor();
     await carregarTurmasDiretor();
-  } catch (err) {
-    toast(err.message);
+    return;
   }
-});
+
+  if (acao === "excluir-turma") {
+    const turmaId = e.target.dataset.turmaId;
+    const turmaNome = e.target.dataset.turmaNome;
+    if (!confirm(`Excluir a turma "${turmaNome}"? Alunos serão desvinculados.`)) return;
+
+    const r = await adminPost("/api/admin/excluir-turma", { id: turmaId });
+    if (!r.ok) {
+      const { data, error } = await supabaseClient
+        .from("turmas")
+        .delete()
+        .eq("id", turmaId)
+        .eq("escola_id", escolaId)
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) {
+        throw new Error(
+          "Sem permissão para excluir. Atualize o site na Vercel ou execute supabase/migracao-policies-delete.sql no Supabase."
+        );
+      }
+      toast("Turma excluída!");
+    } else {
+      toast(r.mensagem);
+    }
+
+    invalidarCacheUsuarios();
+    await carregarTurmasDiretor();
+    return;
+  }
+
+  if (acao === "fechar-modal") {
+    fecharModalEditar();
+    return;
+  }
+
+  if (acao === "salvar-edicao") {
+    const btn = e.target;
+    const id = $("#edit-user-id").value;
+    const role = $("#edit-user-role").value;
+    const body = {
+      id,
+      nome: $("#edit-nome").value,
+      cpf: $("#edit-cpf").value,
+    };
+    if (role === "professor") body.disciplina = $("#edit-disciplinas").value;
+    if (role === "aluno") body.turmaNome = $("#edit-turma").value;
+    const senha = $("#edit-senha").value;
+    if (senha) body.password = senha;
+
+    btn.disabled = true;
+    try {
+      const r = await adminPost("/api/admin/editar-usuario", body);
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar.");
+      invalidarCacheUsuarios();
+      fecharModalEditar();
+      toast(r.mensagem);
+      await carregarUsuariosDiretor();
+      await carregarTurmasDiretor();
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  if (acao === "cad-turma") {
+    const { error } = await supabaseClient
+      .from("turmas")
+      .insert({ escola_id: escolaId, nome: $("#dir-turma-nome").value.trim() });
+    if (error) throw error;
+    toast("Turma cadastrada!");
+  } else if (acao === "cad-aluno") {
+    const r = await adminPost("/api/admin/criar-usuario", {
+      email: $("#dir-al-email").value,
+      password: $("#dir-al-pass").value,
+      nome: $("#dir-al-nome").value,
+      cpf: $("#dir-al-cpf").value,
+      role: "aluno",
+      turmaNome: $("#dir-al-turma").value,
+    });
+    if (!r.ok) throw new Error(r.mensagem);
+    invalidarCacheUsuarios();
+    toast(r.mensagem);
+  } else if (acao === "cad-prof") {
+    const r = await adminPost("/api/admin/criar-usuario", {
+      email: $("#dir-pr-email").value,
+      password: $("#dir-pr-pass").value,
+      nome: $("#dir-pr-nome").value,
+      cpf: $("#dir-pr-cpf").value,
+      role: "professor",
+      disciplina: $("#dir-pr-disc").value,
+    });
+    if (!r.ok) throw new Error(r.mensagem);
+    invalidarCacheUsuarios();
+    toast(r.mensagem);
+  } else if (acao === "vincular") {
+    const profId = await buscarIdPorEmail($("#dir-vinc-prof").value);
+    if (!profId) throw new Error("Professor não encontrado.");
+
+    const { data: turma } = await supabaseClient
+      .from("turmas")
+      .select("id")
+      .eq("escola_id", escolaId)
+      .eq("nome", $("#dir-vinc-turma").value.trim())
+      .maybeSingle();
+
+    if (!turma) throw new Error("Turma não encontrada.");
+
+    const { error } = await supabaseClient.from("turmas").update({ professor_id: profId }).eq("id", turma.id);
+    if (error) throw error;
+    invalidarCacheUsuarios();
+    const usuarios = await obterUsuariosPorId();
+    const prof = usuarios.get(profId);
+    toast(`Professor vinculado! Login: ${prof?.login || $("#dir-vinc-prof").value.trim()}`);
+  } else if (acao === "edit-nf") {
+    const alunoId = await buscarIdPorEmail($("#dir-nf-email").value);
+    if (!alunoId) throw new Error("Aluno não encontrado.");
+
+    const upd = {};
+    if ($("#dir-nf-nota").value !== "") upd.nota = parseFloat($("#dir-nf-nota").value);
+    if ($("#dir-nf-faltas").value !== "") upd.faltas = parseInt($("#dir-nf-faltas").value, 10);
+
+    const { error } = await supabaseClient.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
+    if (error) throw error;
+    toast("Dados atualizados!");
+  } else if (acao === "refresh-turmas") {
+    await carregarTurmasDiretor();
+    return;
+  } else if (acao === "refresh-usuarios") {
+    await carregarUsuariosDiretor();
+    return;
+  } else {
+    return;
+  }
+
+  await carregarUsuariosDiretor();
+  await carregarTurmasDiretor();
+}
+
+function aoClicarDiretor(e) {
+  const acao = e.target.dataset?.acao;
+  if (!acao) return;
+  executarAcaoDiretor(acao, e).catch((err) => toast(err.message));
+}
+
+document.querySelector("#painel-diretor").addEventListener("click", aoClicarDiretor);
+document.querySelector("#modal-editar-usuario").addEventListener("click", aoClicarDiretor);
 
 async function carregarTurmaProfessor() {
   const sem = $("#prof-sem-turma");
