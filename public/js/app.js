@@ -223,6 +223,7 @@ let cacheUsuariosPorId = null;
 let usuariosLista = [];
 let turmasProfessorCache = [];
 let disciplinasProfessorCache = [];
+let professorContexto = { turmaId: null, disciplina: null, aba: "notas" };
 
 function listaDisciplinas(valor) {
   if (!valor) return [];
@@ -253,6 +254,25 @@ function notasDaDisciplina(notas, disciplina) {
   return (notas || []).filter((n) => n.disciplina === disciplina);
 }
 
+function atividadesDaDisciplina(atividades, disciplina) {
+  return (atividades || []).filter((a) => a.disciplina === disciplina);
+}
+
+function encontrarTurmaPorAluno(registroId) {
+  for (const t of turmasProfessorCache || []) {
+    if ((t.alunos || []).some((a) => a.registroId === registroId)) return t;
+  }
+  return null;
+}
+
+function encontrarAtividadePorId(atividadeId) {
+  for (const t of turmasProfessorCache || []) {
+    const a = (t.atividades || []).find((x) => x.id === atividadeId);
+    if (a) return { ...a, turmaId: t.id, turmaNome: t.nome };
+  }
+  return null;
+}
+
 function encontrarNotaPorId(notaId) {
   for (const t of turmasProfessorCache || []) {
     for (const a of t.alunos || []) {
@@ -273,11 +293,27 @@ function formatNotasProfessorHtml(notas, disciplina) {
       return `<div class="nota-item nota-item-editavel">
         <span class="nota-texto">${n.nota} / ${max}${desc}</span>
         <span class="nota-acoes">
-          <button type="button" class="btn-icon btn-sm" data-acao="editar-nota" data-nota-id="${n.id}" title="Editar">✎</button>
-          <button type="button" class="btn-icon btn-icon-danger btn-sm" data-acao="excluir-nota" data-nota-id="${n.id}" title="Excluir">✕</button>
+          <button type="button" class="btn-icon btn-sm" data-acao="editar-nota" data-nota-id="${n.id}" title="Editar nota">✎</button>
+          <button type="button" class="btn-icon btn-icon-danger btn-sm" data-acao="excluir-nota" data-nota-id="${n.id}" title="Excluir nota">✕</button>
         </span>
       </div>`;
     })
+    .join("");
+}
+
+function formatAtividadesProfessorHtml(atividades, disciplina) {
+  const lista = atividadesDaDisciplina(atividades, disciplina);
+  if (!lista.length) return `<p class="meta atividades-vazio">Nenhuma atividade cadastrada para a turma.</p>`;
+  return lista
+    .map(
+      (a) => `<div class="atividade-item nota-item-editavel">
+        <span class="nota-texto"><strong>${escapeHtml(a.descricao)}</strong> · ${a.valorAtividade} pts</span>
+        <span class="nota-acoes">
+          <button type="button" class="btn-icon btn-sm" data-acao="editar-atividade" data-atividade-id="${a.id}" title="Editar atividade">✎</button>
+          <button type="button" class="btn-icon btn-icon-danger btn-sm" data-acao="excluir-atividade" data-atividade-id="${a.id}" title="Excluir atividade">✕</button>
+        </span>
+      </div>`
+    )
     .join("");
 }
 
@@ -412,12 +448,38 @@ function formatSituacaoHtml(notas, faltasDisciplinas, aulasDisciplinas) {
 }
 
 function atualizarMaxNotaAluno() {
-  const atv = parseFloat($("#pr-nota-valor-atv")?.value);
+  const sel = $("#pr-nota-atividade");
+  const opt = sel?.selectedOptions?.[0];
+  const valor = opt?.dataset?.valor ? parseFloat(opt.dataset.valor) : NaN;
   const inputNota = $("#pr-nota-valor");
   if (!inputNota) return;
-  const max = Number.isNaN(atv) || atv <= 0 ? 100 : Math.min(atv, 100);
+  const max = Number.isNaN(valor) || valor <= 0 ? 100 : Math.min(valor, 100);
   inputNota.max = max;
-  inputNota.placeholder = `Nota do aluno (0 a ${max})`;
+  inputNota.placeholder = valor > 0 ? `Nota do aluno (0 a ${max})` : "Selecione a atividade";
+}
+
+function popularSelectAtividades(registroId) {
+  const sel = $("#pr-nota-atividade");
+  if (!sel) return;
+  if (!registroId) {
+    sel.innerHTML = "<option value=''>Selecione o aluno primeiro</option>";
+    atualizarMaxNotaAluno();
+    return;
+  }
+  const turma = encontrarTurmaPorAluno(registroId);
+  const atividades = turma?.atividades || [];
+  if (!atividades.length) {
+    sel.innerHTML = "<option value=''>Crie uma atividade para a turma</option>";
+    atualizarMaxNotaAluno();
+    return;
+  }
+  sel.innerHTML = atividades
+    .map(
+      (a) =>
+        `<option value="${a.id}" data-valor="${a.valorAtividade}">${escapeHtml(a.disciplina)} — ${escapeHtml(a.descricao)} (${a.valorAtividade} pts)</option>`
+    )
+    .join("");
+  atualizarMaxNotaAluno();
 }
 
 function popularSelectsDisciplinas(disciplinas) {
@@ -425,22 +487,27 @@ function popularSelectsDisciplinas(disciplinas) {
     ? "<option value=''>Cadastre disciplinas no diretor</option>"
     : disciplinas.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
 
-  for (const id of ["pr-nota-disciplina", "pr-falta-disciplina", "pr-aulas-disciplina"]) {
+  for (const id of ["pr-atividade-disciplina", "pr-falta-disciplina", "pr-aulas-disciplina"]) {
     const sel = $(`#${id}`);
     if (sel) sel.innerHTML = vazio;
   }
 }
 
-function popularSelectTurmasAulas(turmas) {
-  const sel = $("#pr-aulas-turma");
-  const wrap = $("#pr-aulas-turma-wrap");
-  if (!sel) return;
-  if (!turmas?.length) {
-    sel.innerHTML = "<option value=''>Sem turma</option>";
-    return;
+function popularSelectTurmasProfessor(turmas) {
+  for (const cfg of [
+    { sel: "pr-aulas-turma", wrap: "pr-aulas-turma-wrap" },
+    { sel: "pr-atividade-turma", wrap: "pr-atividade-turma-wrap" },
+  ]) {
+    const el = $(`#${cfg.sel}`);
+    const wrap = $(`#${cfg.wrap}`);
+    if (!el) continue;
+    if (!turmas?.length) {
+      el.innerHTML = "<option value=''>Sem turma</option>";
+      continue;
+    }
+    el.innerHTML = turmas.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join("");
+    if (wrap) wrap.hidden = turmas.length <= 1;
   }
-  sel.innerHTML = turmas.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join("");
-  if (wrap) wrap.hidden = turmas.length <= 1;
 }
 
 function infoExtraUsuario(u) {
@@ -507,6 +574,7 @@ function mapRegistrosParaAlunos(registros) {
     const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
     const notas = (r.notas_disciplinas || []).map((n) => ({
       id: n.id,
+      atividadeId: n.atividade_id,
       disciplina: n.disciplina,
       valorAtividade: n.valor_atividade,
       nota: n.nota,
@@ -573,7 +641,6 @@ async function listarTurmasCompletas() {
 
 function renderTurmas(container, turmas, comSelect = false, modoDiretor = false) {
   if (comSelect && !modoDiretor) {
-    renderTurmasProfessor(container, turmas);
     return;
   }
 
@@ -626,103 +693,197 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
     })
     .join("");
 
-  if (comSelect) {
-    const alunos = turmas
-      .flatMap((t) => (t.alunos || []).map((a) => ({ ...a, turmaNome: t.nome })))
-      .filter((a) => a.registroId);
-
-    if (alunos.length) {
-      const opts = alunos
-        .map((a) => {
-          const label = a.turmaNome ? `${a.nome} (${a.turmaNome})` : a.nome;
-          return `<option value="${a.registroId}">${escapeHtml(label || "Aluno")}</option>`;
-        })
-        .join("");
-      $("#pr-nota-aluno").innerHTML = opts;
-      $("#pr-falta-aluno").innerHTML = opts;
-    } else {
-      $("#pr-nota-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
-      $("#pr-falta-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
-    }
-  }
 }
 
-function renderTurmasProfessor(container, turmas) {
-  if (!turmas?.length) {
-    container.innerHTML = "<p>Nenhuma turma cadastrada.</p>";
+function notaAlunoAtividade(aluno, atividadeId) {
+  return (aluno?.notasDisciplinas || []).find((n) => n.atividadeId === atividadeId);
+}
+
+function obterTurmaContexto() {
+  return (turmasProfessorCache || []).find((t) => t.id === professorContexto.turmaId) || turmasProfessorCache?.[0] || null;
+}
+
+function renderNavDisciplinas(disciplinas) {
+  const nav = $("#pr-disc-nav");
+  if (!nav) return;
+  if (!disciplinas?.length) {
+    nav.innerHTML = `<p class="meta">Sem disciplinas</p>`;
+    return;
+  }
+  nav.innerHTML = disciplinas
+    .map(
+      (d) =>
+        `<button type="button" class="prof-disc-btn${d === professorContexto.disciplina ? " active" : ""}" data-acao="selecionar-disciplina" data-disciplina="${escapeHtml(d)}">${escapeHtml(d)}</button>`
+    )
+    .join("");
+}
+
+function renderSelectContextoTurma(turmas) {
+  const sel = $("#pr-contexto-turma");
+  if (!sel) return;
+  sel.innerHTML = (turmas || [])
+    .map(
+      (t) =>
+        `<option value="${t.id}"${t.id === professorContexto.turmaId ? " selected" : ""}>${escapeHtml(t.nome)}</option>`
+    )
+    .join("");
+}
+
+function popularSelectFaltasAlunos(turma) {
+  const sel = $("#pr-falta-aluno");
+  if (!sel) return;
+  const alunos = turma?.alunos || [];
+  if (!alunos.length) {
+    sel.innerHTML = "<option value=''>Sem alunos</option>";
+    return;
+  }
+  sel.innerHTML = alunos
+    .map((a) => `<option value="${a.registroId}">${escapeHtml(a.nome)}</option>`)
+    .join("");
+}
+
+function renderResumoFrequencia(turma, disciplina) {
+  const box = $("#prof-freq-resumo");
+  if (!box || !turma) return;
+  const aulas = turma.aulasDisciplinas?.[disciplina];
+  const rows = (turma.alunos || [])
+    .map((a) => {
+      const calc = aulas
+        ? calcularFrequenciaDisciplina(a.faltasDisciplinas?.[disciplina] || 0, aulas)
+        : null;
+      const freq = calc
+        ? `<span class="${calc.reprovadoFalta ? "dash-warn" : "dash-ok"}">${calc.percentualFaltas}% faltas</span>`
+        : "—";
+      return `<tr><td>${escapeHtml(a.nome)}</td><td>${freq}</td><td>${formatSituacaoDisciplinaHtml(a.notasDisciplinas, a.faltasDisciplinas, turma.aulasDisciplinas || {}, disciplina)}</td></tr>`;
+    })
+    .join("");
+  box.innerHTML = `
+    <h3>Frequência — ${escapeHtml(disciplina)}</h3>
+    <p class="meta">${aulas ? `${aulas} aulas dadas` : "Cadastre o total de aulas acima."}</p>
+    <table class="tabela-alunos"><thead><tr><th>Aluno</th><th>% Faltas</th><th>Situação</th></tr></thead><tbody>${rows || "<tr><td colspan='3'>Sem alunos</td></tr>"}</tbody></table>`;
+}
+
+function renderGradebook(turma, disciplina) {
+  const container = $("#prof-gradebook");
+  if (!container) return;
+
+  const atividades = atividadesDaDisciplina(turma?.atividades, disciplina);
+  const alunos = turma?.alunos || [];
+
+  if (!atividades.length) {
+    container.innerHTML = `<p class="meta gradebook-vazio">Nenhuma atividade em <strong>${escapeHtml(disciplina)}</strong>. Use o campo acima para criar a primeira.</p>`;
     return;
   }
 
+  const colHeads = atividades
+    .map(
+      (a) => `<th class="grade-col-head">
+        <div class="grade-col-title">${escapeHtml(a.descricao)}</div>
+        <div class="grade-col-meta">${a.valorAtividade} pts</div>
+        <div class="grade-col-acoes">
+          <button type="button" class="btn-icon btn-sm" data-acao="editar-atividade" data-atividade-id="${a.id}" title="Editar">✎</button>
+          <button type="button" class="btn-icon btn-icon-danger btn-sm" data-acao="excluir-atividade" data-atividade-id="${a.id}" title="Excluir">✕</button>
+        </div>
+      </th>`
+    )
+    .join("");
+
+  const rows = alunos
+    .map((a) => {
+      const cells = atividades
+        .map((atv) => {
+          const n = notaAlunoAtividade(a, atv.id);
+          const val = n ? `value="${n.nota}"` : "";
+          const notaId = n ? `data-nota-id="${n.id}"` : "";
+          return `<td class="grade-cell">
+            <input class="grade-input" type="number" step="0.1" min="0" max="${atv.valorAtividade}"
+              data-registro-id="${a.registroId}" data-atividade-id="${atv.id}" ${notaId} ${val} placeholder="—" title="0 a ${atv.valorAtividade}" />
+          </td>`;
+        })
+        .join("");
+      return `<tr>
+        <td class="grade-student sticky-col">${escapeHtml(a.nome)}</td>
+        ${cells}
+        <td class="grade-total sticky-total">${formatTotalHtml(notasDaDisciplina(a.notasDisciplinas, disciplina))}</td>
+      </tr>`;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <div class="gradebook-scroll">
+      <table class="gradebook-table tabela-alunos">
+        <thead>
+          <tr>
+            <th class="sticky-col grade-corner">Aluno</th>
+            ${colHeads}
+            <th class="sticky-total">Total</th>
+          </tr>
+        </thead>
+        <tbody>${rows || "<tr><td colspan='99'>Sem alunos na turma</td></tr>"}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderPainelProfessorCanvas() {
+  const turmas = turmasProfessorCache || [];
   const disciplinas = disciplinasProfessorCache.length
     ? disciplinasProfessorCache
     : listaDisciplinas(turmas[0]?.professorDisciplinas);
 
-  container.innerHTML = turmas
-    .map((t) => {
-      const aulas = t.aulasDisciplinas || {};
-      const discBlocos = disciplinas
-        .map((disc) => {
-          const rows = (t.alunos || [])
-            .map(
-              (a) =>
-                `<tr>
-                  <td>${escapeHtml(a.nome)}</td>
-                  <td>${escapeHtml(a.cpf || "")}</td>
-                  <td class="col-notas">${formatNotasProfessorHtml(a.notasDisciplinas, disc)}</td>
-                  <td class="col-total">${formatTotalHtml(notasDaDisciplina(a.notasDisciplinas, disc))}</td>
-                  <td class="col-freq">${formatFrequenciaDisciplinaHtml(a.faltasDisciplinas, aulas, disc)}</td>
-                  <td>${formatSituacaoDisciplinaHtml(a.notasDisciplinas, a.faltasDisciplinas, aulas, disc)}</td>
-                </tr>`
-            )
-            .join("");
+  if (!professorContexto.turmaId && turmas[0]) professorContexto.turmaId = turmas[0].id;
+  if (!professorContexto.disciplina && disciplinas[0]) professorContexto.disciplina = disciplinas[0];
 
-          const aulaInfo = aulas[disc]
-            ? `<span class="meta disc-aulas-info">${aulas[disc]} aulas dadas</span>`
-            : `<span class="meta disc-aulas-info">Aulas não cadastradas</span>`;
+  const turma = obterTurmaContexto();
+  const disciplina = professorContexto.disciplina || disciplinas[0];
 
-          return `
-          <div class="disc-bloco">
-            <div class="disc-bloco-head">
-              <h5>${escapeHtml(disc)}</h5>
-              ${aulaInfo}
-            </div>
-            ${
-              rows
-                ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Atividades</th><th>Total</th><th>% Faltas</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`
-                : "<p class='meta'>Sem alunos</p>"
-            }
-          </div>`;
-        })
-        .join("");
+  renderSelectContextoTurma(turmas);
+  renderNavDisciplinas(disciplinas);
+  popularSelectFaltasAlunos(turma);
 
-      return `
-      <div class="turma-bloco" data-turma-id="${t.id}">
-        <div class="turma-head">
-          <h4>${escapeHtml(t.nome)}</h4>
-        </div>
-        <p class="meta">Disciplinas: ${renderDisciplinasHtml(t.professorDisciplinas || disciplinas.join(", "))}</p>
-        <div class="disciplinas-grid">${discBlocos}</div>
-      </div>`;
-    })
-    .join("");
+  const abaNotas = $("#prof-aba-notas");
+  const abaFreq = $("#prof-aba-frequencia");
+  if (abaNotas) abaNotas.hidden = professorContexto.aba !== "notas";
+  if (abaFreq) abaFreq.hidden = professorContexto.aba !== "frequencia";
 
-  const alunos = turmas
-    .flatMap((t) => (t.alunos || []).map((a) => ({ ...a, turmaNome: t.nome })))
-    .filter((a) => a.registroId);
+  document.querySelectorAll(".prof-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.aba === professorContexto.aba);
+  });
 
-  if (alunos.length) {
-    const opts = alunos
-      .map((a) => {
-        const label = a.turmaNome ? `${a.nome} (${a.turmaNome})` : a.nome;
-        return `<option value="${a.registroId}">${escapeHtml(label || "Aluno")}</option>`;
-      })
-      .join("");
-    $("#pr-nota-aluno").innerHTML = opts;
-    $("#pr-falta-aluno").innerHTML = opts;
-  } else {
-    $("#pr-nota-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
-    $("#pr-falta-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
+  if (turma && disciplina) {
+    if (professorContexto.aba === "notas") renderGradebook(turma, disciplina);
+    else renderResumoFrequencia(turma, disciplina);
   }
+}
+
+async function salvarNotaCelula(input) {
+  const registroId = input.dataset.registroId;
+  const atividadeId = input.dataset.atividadeId;
+  const notaId = input.dataset.notaId || "";
+  const valorStr = input.value.trim();
+  const max = parseFloat(input.max) || 100;
+
+  if (!valorStr) {
+    if (notaId && confirm("Remover a nota deste aluno nesta atividade?")) {
+      const r = await adminPost("/api/professor/notas", { acao: "excluir", notaId });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível remover.");
+      toast(r.mensagem || "Nota removida.");
+      await carregarTurmaProfessor(true);
+    }
+    return;
+  }
+
+  const nota = parseFloat(valorStr);
+  if (Number.isNaN(nota) || nota < 0 || nota > max) {
+    throw new Error(`Nota deve ser entre 0 e ${max}.`);
+  }
+
+  const r = notaId
+    ? await adminPost("/api/professor/notas", { acao: "editar", notaId, nota })
+    : await adminPost("/api/professor/notas", { acao: "lancar", registroId, atividadeId, nota });
+
+  if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar a nota.");
+  input.dataset.notaId = notaId || input.dataset.notaId;
+  await carregarTurmaProfessor(true);
 }
 
 function labelPerfil(role) {
@@ -983,7 +1144,8 @@ function aoClicarDiretor(e) {
 document.querySelector("#painel-diretor").addEventListener("click", aoClicarDiretor);
 document.querySelector("#modal-editar-usuario").addEventListener("click", aoClicarDiretor);
 
-async function carregarTurmaProfessor() {
+async function carregarTurmaProfessor(preservar = false) {
+  const ctxAnt = preservar ? { ...professorContexto } : null;
   const sem = $("#prof-sem-turma");
   const cont = $("#prof-conteudo");
 
@@ -1030,43 +1192,45 @@ async function carregarTurmaProfessor() {
 
   sem.hidden = true;
   cont.hidden = false;
-  $("#prof-turma-titulo").textContent =
-    turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
   turmasProfessorCache = turmas;
   disciplinasProfessorCache = disciplinasProfessor;
-  popularSelectsDisciplinas(disciplinasProfessor);
-  popularSelectTurmasAulas(turmas);
-  atualizarMaxNotaAluno();
-  renderTurmas($("#prof-lista-alunos"), turmas, true);
+
+  const disc = disciplinasProfessor.length ? disciplinasProfessor : listaDisciplinas(turmas[0]?.professorDisciplinas);
+  if (!preservar || !ctxAnt?.turmaId || !turmas.some((t) => t.id === ctxAnt.turmaId)) {
+    professorContexto = { turmaId: turmas[0].id, disciplina: disc[0] || null, aba: "notas" };
+  } else {
+    professorContexto = {
+      turmaId: ctxAnt.turmaId,
+      disciplina: disc.includes(ctxAnt.disciplina) ? ctxAnt.disciplina : disc[0] || null,
+      aba: ctxAnt.aba || "notas",
+    };
+  }
+
+  renderPainelProfessorCanvas();
 }
 
-const prNotaValorAtv = $("#pr-nota-valor-atv");
-if (prNotaValorAtv) {
-  prNotaValorAtv.addEventListener("input", atualizarMaxNotaAluno);
-}
+document.querySelector("#pr-contexto-turma")?.addEventListener("change", (e) => {
+  professorContexto.turmaId = e.target.value;
+  renderPainelProfessorCanvas();
+});
 
-const editNotaValorAtv = $("#edit-nota-valor-atv");
-if (editNotaValorAtv) {
-  editNotaValorAtv.addEventListener("input", atualizarMaxNotaEditModal);
-}
-
-function atualizarMaxNotaEditModal() {
-  const atv = parseFloat($("#edit-nota-valor-atv")?.value);
-  const inputNota = $("#edit-nota-valor");
-  if (!inputNota) return;
-  const max = Number.isNaN(atv) || atv <= 0 ? 100 : Math.min(atv, 100);
-  inputNota.max = max;
-  inputNota.placeholder = `Nota do aluno (0 a ${max})`;
-}
+document.querySelector("#prof-conteudo")?.addEventListener("change", async (e) => {
+  if (!e.target.classList.contains("grade-input")) return;
+  try {
+    await salvarNotaCelula(e.target);
+  } catch (err) {
+    toast(err.message);
+  }
+});
 
 function abrirModalEditarNota(nota) {
   $("#edit-nota-id").value = nota.id;
-  $("#edit-nota-disciplina-label").textContent = nota.disciplina;
-  $("#edit-nota-valor-atv").value = nota.valorAtividade ?? 10;
+  $("#edit-nota-info-label").textContent = `${nota.disciplina} — ${nota.descricao || "Atividade"} (máx. ${nota.valorAtividade ?? 10} pts)`;
   $("#edit-nota-valor").value = nota.nota;
-  $("#edit-nota-desc").value = nota.descricao || "";
-  atualizarMaxNotaEditModal();
+  const max = Number(nota.valorAtividade) || 10;
+  $("#edit-nota-valor").max = max;
+  $("#edit-nota-valor").placeholder = `Nota do aluno (0 a ${max})`;
   $("#modal-editar-nota").hidden = false;
 }
 
@@ -1074,33 +1238,53 @@ function fecharModalEditarNota() {
   $("#modal-editar-nota").hidden = true;
 }
 
+function abrirModalEditarAtividade(atividade) {
+  $("#edit-atividade-id").value = atividade.id;
+  $("#edit-atividade-disciplina-label").textContent = atividade.disciplina;
+  $("#edit-atividade-desc").value = atividade.descricao || "";
+  $("#edit-atividade-valor").value = atividade.valorAtividade ?? 10;
+  $("#modal-editar-atividade").hidden = false;
+}
+
+function fecharModalEditarAtividade() {
+  $("#modal-editar-atividade").hidden = true;
+}
+
 async function salvarNotaEdicao() {
   const notaId = $("#edit-nota-id").value;
-  const valorAtvVal = $("#edit-nota-valor-atv").value;
   const notaVal = $("#edit-nota-valor").value;
-  const descricao = $("#edit-nota-desc").value.trim();
-  if (!notaId) throw new Error("Atividade inválida.");
-  if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
+  if (!notaId) throw new Error("Nota inválida.");
   if (notaVal === "") throw new Error("Informe a nota do aluno.");
-  const valorAtividade = parseFloat(valorAtvVal);
   const nota = parseFloat(notaVal);
+  if (Number.isNaN(nota)) throw new Error("Nota inválida.");
+  const r = await adminPost("/api/professor/notas", { acao: "editar", notaId, nota });
+  if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar a nota.");
+  toast(r.mensagem || "Nota atualizada!");
+  fecharModalEditarNota();
+  await carregarTurmaProfessor(true);
+}
+
+async function salvarAtividadeEdicao() {
+  const atividadeId = $("#edit-atividade-id").value;
+  const descricao = $("#edit-atividade-desc").value.trim();
+  const valorAtvVal = $("#edit-atividade-valor").value;
+  if (!atividadeId) throw new Error("Atividade inválida.");
+  if (!descricao) throw new Error("Informe a descrição.");
+  if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
+  const valorAtividade = parseFloat(valorAtvVal);
   if (Number.isNaN(valorAtividade) || valorAtividade <= 0 || valorAtividade > 100) {
     throw new Error("Valor da atividade deve ser entre 1 e 100.");
   }
-  if (Number.isNaN(nota) || nota < 0 || nota > valorAtividade) {
-    throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
-  }
   const r = await adminPost("/api/professor/notas", {
-    acao: "editar",
-    notaId,
-    valorAtividade,
-    nota,
+    acao: "editar-atividade",
+    atividadeId,
     descricao,
+    valorAtividade,
   });
   if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar a atividade.");
   toast(r.mensagem || "Atividade atualizada!");
-  fecharModalEditarNota();
-  await carregarTurmaProfessor();
+  fecharModalEditarAtividade();
+  await carregarTurmaProfessor(true);
 }
 
 document.querySelector("#modal-editar-nota")?.addEventListener("click", async (e) => {
@@ -1114,32 +1298,54 @@ document.querySelector("#modal-editar-nota")?.addEventListener("click", async (e
   }
 });
 
+document.querySelector("#modal-editar-atividade")?.addEventListener("click", async (e) => {
+  const acao = e.target.dataset?.acao;
+  if (!acao) return;
+  try {
+    if (acao === "fechar-modal-atividade") fecharModalEditarAtividade();
+    else if (acao === "salvar-atividade-edicao") await salvarAtividadeEdicao();
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 document.querySelector("#painel-professor").addEventListener("click", async (e) => {
+  if (e.target.classList.contains("prof-tab")) {
+    professorContexto.aba = e.target.dataset.aba;
+    renderPainelProfessorCanvas();
+    return;
+  }
+
   const acao = e.target.dataset?.acao;
   if (!acao) return;
 
   try {
+    if (acao === "selecionar-disciplina") {
+      professorContexto.disciplina = e.target.dataset.disciplina;
+      renderPainelProfessorCanvas();
+      return;
+    }
+
     if (acao === "fechar-modal-nota") {
       fecharModalEditarNota();
       return;
     }
 
-    if (acao === "editar-nota") {
-      const nota = encontrarNotaPorId(e.target.dataset.notaId);
-      if (!nota) throw new Error("Atividade não encontrada.");
-      abrirModalEditarNota(nota);
+    if (acao === "editar-atividade") {
+      const atividade = encontrarAtividadePorId(e.target.dataset.atividadeId);
+      if (!atividade) throw new Error("Atividade não encontrada.");
+      abrirModalEditarAtividade(atividade);
       return;
     }
 
-    if (acao === "excluir-nota") {
-      const nota = encontrarNotaPorId(e.target.dataset.notaId);
-      if (!nota) throw new Error("Atividade não encontrada.");
-      const rotulo = nota.descricao ? `"${nota.descricao}"` : "esta atividade";
-      if (!confirm(`Excluir ${rotulo} (${nota.nota}/${nota.valorAtividade ?? 10})?`)) return;
-      const r = await adminPost("/api/professor/notas", { acao: "excluir", notaId: nota.id });
+    if (acao === "excluir-atividade") {
+      const atividade = encontrarAtividadePorId(e.target.dataset.atividadeId);
+      if (!atividade) throw new Error("Atividade não encontrada.");
+      if (!confirm(`Excluir a atividade "${atividade.descricao}" da turma? Todas as notas dos alunos serão removidas.`)) return;
+      const r = await adminPost("/api/professor/notas", { acao: "excluir-atividade", atividadeId: atividade.id });
       if (!r.ok) throw new Error(r.mensagem || "Não foi possível excluir a atividade.");
       toast(r.mensagem || "Atividade excluída!");
-      await carregarTurmaProfessor();
+      await carregarTurmaProfessor(true);
       return;
     }
 
@@ -1148,9 +1354,36 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       return;
     }
 
+    if (acao === "criar-atividade") {
+      const turmaId = professorContexto.turmaId;
+      const disciplina = professorContexto.disciplina;
+      const descricao = $("#pr-grade-desc").value.trim();
+      const valorAtvVal = $("#pr-grade-valor").value;
+      if (!turmaId) throw new Error("Selecione a turma.");
+      if (!disciplina) throw new Error("Selecione a disciplina.");
+      if (!descricao) throw new Error("Informe a descrição da atividade.");
+      if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
+      const valorAtividade = parseFloat(valorAtvVal);
+      if (Number.isNaN(valorAtividade) || valorAtividade <= 0 || valorAtividade > 100) {
+        throw new Error("Valor da atividade deve ser entre 1 e 100.");
+      }
+      const r = await adminPost("/api/professor/notas", {
+        acao: "criar-atividade",
+        turmaId,
+        disciplina,
+        descricao,
+        valorAtividade,
+      });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível criar a atividade.");
+      toast(r.mensagem || "Atividade criada!");
+      $("#pr-grade-desc").value = "";
+      await carregarTurmaProfessor(true);
+      return;
+    }
+
     if (acao === "definir-aulas") {
-      const turmaId = $("#pr-aulas-turma").value;
-      const disciplina = $("#pr-aulas-disciplina").value;
+      const turmaId = professorContexto.turmaId;
+      const disciplina = professorContexto.disciplina;
       const totalAulas = $("#pr-aulas-total").value;
       if (!turmaId) throw new Error("Selecione a turma.");
       if (!disciplina) throw new Error("Selecione a disciplina.");
@@ -1159,45 +1392,14 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar.");
       toast(r.mensagem || "Aulas cadastradas!");
       $("#pr-aulas-total").value = "";
-      await carregarTurmaProfessor();
+      await carregarTurmaProfessor(true);
       return;
     }
 
-    const registroId =
-      acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
-    if (!registroId) throw new Error("Selecione um aluno.");
-
-    if (acao === "lancar-nota") {
-      const notaVal = $("#pr-nota-valor").value;
-      const valorAtvVal = $("#pr-nota-valor-atv").value;
-      const disciplina = $("#pr-nota-disciplina").value;
-      const descricao = $("#pr-nota-desc").value.trim();
-      if (!disciplina) throw new Error("Selecione a disciplina.");
-      if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
-      if (notaVal === "") throw new Error("Informe a nota do aluno.");
-      const valorAtividade = parseFloat(valorAtvVal);
-      const nota = parseFloat(notaVal);
-      if (Number.isNaN(valorAtividade) || valorAtividade <= 0 || valorAtividade > 100) {
-        throw new Error("Valor da atividade deve ser entre 1 e 100.");
-      }
-      if (Number.isNaN(nota) || nota < 0 || nota > valorAtividade) {
-        throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
-      }
-
-      const r = await adminPost("/api/professor/notas", {
-        acao: "lancar",
-        registroId,
-        disciplina,
-        valorAtividade,
-        nota,
-        descricao,
-      });
-      if (!r.ok) throw new Error(r.mensagem || "Não foi possível lançar a nota.");
-      toast(r.mensagem || "Nota lançada!");
-      $("#pr-nota-valor").value = "";
-      $("#pr-nota-desc").value = "";
-    } else if (acao === "lancar-falta" || acao === "remover-falta") {
-      const disciplina = $("#pr-falta-disciplina").value;
+    if (acao === "lancar-falta" || acao === "remover-falta") {
+      const registroId = $("#pr-falta-aluno").value;
+      const disciplina = professorContexto.disciplina;
+      if (!registroId) throw new Error("Selecione um aluno.");
       if (!disciplina) throw new Error("Selecione a disciplina.");
       const r = await adminPost("/api/professor/lancar-falta", {
         registroId,
@@ -1206,8 +1408,8 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       });
       if (!r.ok) throw new Error(r.mensagem || "Não foi possível atualizar as faltas.");
       toast(r.mensagem || (acao === "remover-falta" ? "Falta removida!" : "Falta registrada!"));
+      await carregarTurmaProfessor(true);
     }
-    await carregarTurmaProfessor();
   } catch (err) {
     toast(err.message);
   }

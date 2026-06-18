@@ -127,44 +127,53 @@
         </section>
       </section>
 
-      <section id="painel-professor" class="painel" hidden>
+      <section id="painel-professor" class="painel painel-professor-canvas" hidden>
         <h2>Painel do Professor</h2>
         <div id="prof-sem-turma" class="alert" hidden></div>
-        <div id="prof-conteudo" hidden>
-          <div class="grid-cards">
-            <article class="card">
-              <h3>Lançar nota</h3>
-              <select id="pr-nota-aluno" class="select-full"></select>
-              <select id="pr-nota-disciplina" class="select-full"></select>
-              <input type="number" id="pr-nota-valor-atv" class="select-full" placeholder="Valor da atividade (1 a 100)" step="0.1" min="1" max="100" value="10" />
-              <input type="number" id="pr-nota-valor" placeholder="Nota do aluno (0 a 10)" step="0.1" min="0" max="10" />
-              <input type="text" id="pr-nota-desc" class="select-full" placeholder="Descrição (ex: Prova 1, Trabalho)" maxlength="120" />
-              <button type="button" class="btn-primary btn-sm" data-acao="lancar-nota">Lançar</button>
-            </article>
-            <article class="card">
-              <h3>Aulas dadas na disciplina</h3>
-              <p class="meta card-hint">Máx. 25% de faltas por disciplina (por lei).</p>
-              <div id="pr-aulas-turma-wrap">
-                <select id="pr-aulas-turma" class="select-full"></select>
+        <div id="prof-conteudo" class="prof-canvas-wrap" hidden>
+          <aside class="prof-sidebar card">
+            <p class="dash-label">Turma</p>
+            <select id="pr-contexto-turma" class="select-full"></select>
+            <p class="dash-label prof-sidebar-label">Disciplina</p>
+            <nav id="pr-disc-nav" class="prof-disc-nav"></nav>
+            <nav class="prof-tab-nav">
+              <button type="button" class="prof-tab active" data-aba="notas">Notas</button>
+              <button type="button" class="prof-tab" data-aba="frequencia">Frequência</button>
+            </nav>
+          </aside>
+          <main class="prof-main">
+            <div id="prof-aba-notas" class="prof-aba">
+              <div class="gradebook-toolbar card">
+                <h3>Livro de notas</h3>
+                <p class="meta card-hint">Crie atividades para a turma e preencha a nota de cada aluno na grade — como no Canvas.</p>
+                <div class="gradebook-nova-atv">
+                  <input type="text" id="pr-grade-desc" placeholder="Nova atividade (ex: Prova 1, Trabalho)" maxlength="120" />
+                  <input type="number" id="pr-grade-valor" value="10" min="1" max="100" step="0.1" title="Valor da atividade" />
+                  <button type="button" class="btn-primary btn-sm" data-acao="criar-atividade">+ Atividade</button>
+                </div>
               </div>
-              <select id="pr-aulas-disciplina" class="select-full"></select>
-              <input type="number" id="pr-aulas-total" class="select-full" placeholder="Total de aulas dadas" min="1" step="1" />
-              <button type="button" class="btn-primary btn-sm" data-acao="definir-aulas">Salvar aulas</button>
-            </article>
-            <article class="card">
-              <h3>Faltas</h3>
-              <select id="pr-falta-aluno" class="select-full"></select>
-              <select id="pr-falta-disciplina" class="select-full"></select>
-              <div class="acoes-faltas-dir">
-                <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar falta</button>
-                <button type="button" class="btn-ghost btn-sm" data-acao="remover-falta">Remover 1 falta</button>
+              <div id="prof-gradebook" class="gradebook-container card"></div>
+            </div>
+            <div id="prof-aba-frequencia" class="prof-aba" hidden>
+              <div class="grid-cards prof-freq-cards">
+                <article class="card">
+                  <h3>Aulas dadas</h3>
+                  <p class="meta card-hint">Turma e disciplina vêm do menu à esquerda. Máx. 25% de faltas por lei.</p>
+                  <input type="number" id="pr-aulas-total" class="select-full" placeholder="Total de aulas dadas" min="1" step="1" />
+                  <button type="button" class="btn-primary btn-sm" data-acao="definir-aulas">Salvar aulas</button>
+                </article>
+                <article class="card">
+                  <h3>Faltas do aluno</h3>
+                  <select id="pr-falta-aluno" class="select-full"></select>
+                  <div class="acoes-faltas-dir">
+                    <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar falta</button>
+                    <button type="button" class="btn-ghost btn-sm" data-acao="remover-falta">Remover 1 falta</button>
+                  </div>
+                </article>
               </div>
-            </article>
-          </div>
-          <section class="card card-wide">
-            <h3 id="prof-turma-titulo">Minha turma</h3>
-            <div id="prof-lista-alunos" class="lista-turmas"></div>
-          </section>
+              <div id="prof-freq-resumo" class="card freq-resumo-card"></div>
+            </div>
+          </main>
         </div>
       </section>
 
@@ -214,22 +223,14 @@
     <div id="modal-editar-nota" class="modal-overlay" hidden>
       <div class="modal-card" role="dialog" aria-labelledby="modal-nota-titulo">
         <div class="card-head">
-          <h3 id="modal-nota-titulo">Editar atividade</h3>
+          <h3 id="modal-nota-titulo">Editar nota do aluno</h3>
           <button type="button" class="btn-ghost btn-sm" data-acao="fechar-modal-nota">✕</button>
         </div>
         <input type="hidden" id="edit-nota-id" />
-        <p id="edit-nota-disciplina-label" class="meta modal-disc-label"></p>
-        <label>
-          <span>Valor da atividade</span>
-          <input type="number" id="edit-nota-valor-atv" min="1" max="100" step="0.1" />
-        </label>
+        <p id="edit-nota-info-label" class="meta modal-disc-label"></p>
         <label>
           <span>Nota do aluno</span>
           <input type="number" id="edit-nota-valor" step="0.1" min="0" />
-        </label>
-        <label>
-          <span>Descrição</span>
-          <input type="text" id="edit-nota-desc" maxlength="120" placeholder="Ex: Prova 1, Trabalho" />
         </label>
         <div class="modal-acoes">
           <button type="button" class="btn-ghost" data-acao="fechar-modal-nota">Cancelar</button>
@@ -237,9 +238,31 @@
         </div>
       </div>
     </div>
+    <div id="modal-editar-atividade" class="modal-overlay" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-atividade-titulo">
+        <div class="card-head">
+          <h3 id="modal-atividade-titulo">Editar atividade da turma</h3>
+          <button type="button" class="btn-ghost btn-sm" data-acao="fechar-modal-atividade">✕</button>
+        </div>
+        <input type="hidden" id="edit-atividade-id" />
+        <p id="edit-atividade-disciplina-label" class="meta modal-disc-label"></p>
+        <label>
+          <span>Descrição</span>
+          <input type="text" id="edit-atividade-desc" maxlength="120" placeholder="Ex: Prova 1, Trabalho" />
+        </label>
+        <label>
+          <span>Valor da atividade</span>
+          <input type="number" id="edit-atividade-valor" min="1" max="100" step="0.1" />
+        </label>
+        <div class="modal-acoes">
+          <button type="button" class="btn-ghost" data-acao="fechar-modal-atividade">Cancelar</button>
+          <button type="button" class="btn-primary" data-acao="salvar-atividade-edicao">Salvar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=19"></script>
+  <script src="/js/app.js?v=21"></script>
 </body>
 </html>

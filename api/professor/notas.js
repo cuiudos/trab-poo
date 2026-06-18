@@ -1,50 +1,143 @@
 const { parseBody } = require("../_lib/body");
-const { autenticarProfessor } = require("../_lib/auth-professor");
-const { listaDisciplinas } = require("../_lib/disciplinas");
+const { autenticarProfessor, validarDisciplina } = require("../_lib/auth-professor");
 const { validarNotaProfessor } = require("../_lib/validar-nota-professor");
+const { validarAtividadeProfessor } = require("../_lib/validar-atividade-professor");
 
-function validarValoresNota(valorAtividade, nota) {
-  if (valorAtividade === undefined || valorAtividade === null || valorAtividade === "") {
-    return { ok: false, mensagem: "Valor da atividade é obrigatório." };
-  }
+function validarNotaAluno(nota, valorMax) {
   if (nota === undefined || nota === null || nota === "") {
     return { ok: false, mensagem: "Nota do aluno é obrigatória." };
+  }
+  const notaNum = parseFloat(nota);
+  if (Number.isNaN(notaNum) || notaNum < 0 || notaNum > valorMax) {
+    return { ok: false, mensagem: `Nota do aluno deve ser entre 0 e ${valorMax}.` };
+  }
+  return { ok: true, notaNum };
+}
+
+function validarValorAtividade(valorAtividade) {
+  if (valorAtividade === undefined || valorAtividade === null || valorAtividade === "") {
+    return { ok: false, mensagem: "Valor da atividade é obrigatório." };
   }
   const valorAtvNum = parseFloat(valorAtividade);
   if (Number.isNaN(valorAtvNum) || valorAtvNum <= 0 || valorAtvNum > 100) {
     return { ok: false, mensagem: "Valor da atividade deve ser entre 1 e 100." };
   }
-  const notaNum = parseFloat(nota);
-  if (Number.isNaN(notaNum) || notaNum < 0 || notaNum > valorAtvNum) {
-    return {
-      ok: false,
-      mensagem: `Nota do aluno deve ser entre 0 e ${valorAtvNum} (valor da atividade).`,
-    };
+  return { ok: true, valorAtvNum };
+}
+
+async function verificarTurmaProfessor(admin, userId, turmaId) {
+  const { data: turma, error } = await admin
+    .from("turmas")
+    .select("id")
+    .eq("id", turmaId)
+    .eq("professor_id", userId)
+    .maybeSingle();
+  if (error || !turma) {
+    return { ok: false, status: 403, mensagem: "Turma não encontrada ou não é sua." };
   }
-  return { ok: true, valorAtvNum, notaNum };
+  return { ok: true, turma };
+}
+
+async function criarAtividade(admin, userId, perfil, body, res) {
+  const { turmaId, disciplina, descricao, valorAtividade } = body;
+  if (!turmaId) return res.status(400).json({ ok: false, mensagem: "Turma é obrigatória." });
+  if (!disciplina?.trim()) return res.status(400).json({ ok: false, mensagem: "Disciplina é obrigatória." });
+  if (!descricao?.trim()) return res.status(400).json({ ok: false, mensagem: "Descrição é obrigatória." });
+
+  const vals = validarValorAtividade(valorAtividade);
+  if (!vals.ok) return res.status(400).json({ ok: false, mensagem: vals.mensagem });
+
+  const turmaOk = await verificarTurmaProfessor(admin, userId, turmaId);
+  if (!turmaOk.ok) return res.status(turmaOk.status).json({ ok: false, mensagem: turmaOk.mensagem });
+
+  const disc = validarDisciplina(perfil, disciplina);
+  if (!disc.ok) return res.status(400).json({ ok: false, mensagem: disc.mensagem });
+
+  const { error: insertErr } = await admin.from("atividades_turma").insert({
+    turma_id: turmaId,
+    disciplina: disc.discCanon,
+    descricao: descricao.trim(),
+    valor_atividade: vals.valorAtvNum,
+    professor_id: userId,
+  });
+
+  if (insertErr?.message?.includes("atividades_turma")) {
+    return res.status(400).json({
+      ok: false,
+      mensagem: "Execute supabase/migracao-atividades-turma.sql no Supabase.",
+    });
+  }
+  if (insertErr) return res.status(400).json({ ok: false, mensagem: insertErr.message });
+
+  return res.json({
+    ok: true,
+    mensagem: `Atividade "${descricao.trim()}" criada para a turma em ${disc.discCanon} (vale ${vals.valorAtvNum} pts).`,
+  });
+}
+
+async function editarAtividade(admin, userId, perfil, body, res) {
+  const { atividadeId, descricao, valorAtividade } = body;
+  const validacao = await validarAtividadeProfessor(admin, userId, perfil, atividadeId);
+  if (!validacao.ok) {
+    return res.status(validacao.status).json({ ok: false, mensagem: validacao.mensagem });
+  }
+  if (!descricao?.trim()) return res.status(400).json({ ok: false, mensagem: "Descrição é obrigatória." });
+
+  const vals = validarValorAtividade(valorAtividade);
+  if (!vals.ok) return res.status(400).json({ ok: false, mensagem: vals.mensagem });
+
+  const desc = descricao.trim();
+  const { error: updateErr } = await admin
+    .from("atividades_turma")
+    .update({ descricao: desc, valor_atividade: vals.valorAtvNum })
+    .eq("id", atividadeId);
+
+  if (updateErr) return res.status(400).json({ ok: false, mensagem: updateErr.message });
+
+  await admin
+    .from("notas_disciplinas")
+    .update({ descricao: desc, valor_atividade: vals.valorAtvNum })
+    .eq("atividade_id", atividadeId);
+
+  return res.json({
+    ok: true,
+    mensagem: `Atividade atualizada: "${desc}" (${vals.valorAtvNum} pts) em ${validacao.discCanon}.`,
+  });
+}
+
+async function excluirAtividade(admin, userId, perfil, body, res) {
+  const { atividadeId } = body;
+  const validacao = await validarAtividadeProfessor(admin, userId, perfil, atividadeId);
+  if (!validacao.ok) {
+    return res.status(validacao.status).json({ ok: false, mensagem: validacao.mensagem });
+  }
+
+  const { error: delErr } = await admin.from("atividades_turma").delete().eq("id", atividadeId);
+  if (delErr) return res.status(400).json({ ok: false, mensagem: delErr.message });
+
+  const atv = validacao.atividade;
+  return res.json({
+    ok: true,
+    mensagem: `Atividade "${atv.descricao}" excluída de ${validacao.discCanon} (notas dos alunos removidas).`,
+  });
 }
 
 async function lancarNota(admin, userId, perfil, body, res) {
-  const { registroId, disciplina, nota, descricao, valorAtividade } = body;
+  const { registroId, atividadeId, nota } = body;
   if (!registroId) return res.status(400).json({ ok: false, mensagem: "Aluno é obrigatório." });
-  if (!disciplina?.trim()) return res.status(400).json({ ok: false, mensagem: "Disciplina é obrigatória." });
 
-  const vals = validarValoresNota(valorAtividade, nota);
-  if (!vals.ok) return res.status(400).json({ ok: false, mensagem: vals.mensagem });
-
-  const minhasDisciplinas = listaDisciplinas(perfil.disciplina);
-  const discNorm = disciplina.trim();
-  const discCanon = minhasDisciplinas.find((d) => d.toLowerCase() === discNorm.toLowerCase());
-  if (!discCanon) {
-    return res.status(400).json({
-      ok: false,
-      mensagem: `Disciplina inválida. Suas disciplinas: ${minhasDisciplinas.join(", ") || "nenhuma cadastrada"}.`,
-    });
+  const validacao = await validarAtividadeProfessor(admin, userId, perfil, atividadeId);
+  if (!validacao.ok) {
+    return res.status(validacao.status).json({ ok: false, mensagem: validacao.mensagem });
   }
+
+  const atv = validacao.atividade;
+  const vals = validarNotaAluno(nota, atv.valor_atividade);
+  if (!vals.ok) return res.status(400).json({ ok: false, mensagem: vals.mensagem });
 
   const { data: registro, error: regErr } = await admin
     .from("registros_alunos")
-    .select("id, turma:turmas(professor_id)")
+    .select("id, turma_id, turma:turmas(professor_id)")
     .eq("id", registroId)
     .maybeSingle();
 
@@ -56,58 +149,68 @@ async function lancarNota(admin, userId, perfil, body, res) {
   if (turma?.professor_id !== userId) {
     return res.status(403).json({ ok: false, mensagem: "Este aluno não está na sua turma." });
   }
+  if (registro.turma_id !== atv.turma_id) {
+    return res.status(400).json({ ok: false, mensagem: "Esta atividade não é da turma do aluno." });
+  }
+
+  const { data: existente } = await admin
+    .from("notas_disciplinas")
+    .select("id")
+    .eq("registro_aluno_id", registroId)
+    .eq("atividade_id", atividadeId)
+    .maybeSingle();
+
+  if (existente?.id) {
+    return res.status(400).json({
+      ok: false,
+      mensagem: "Este aluno já tem nota nesta atividade. Use editar na tabela.",
+    });
+  }
 
   const { error: insertErr } = await admin.from("notas_disciplinas").insert({
     registro_aluno_id: registroId,
-    disciplina: discCanon,
-    valor_atividade: vals.valorAtvNum,
+    atividade_id: atividadeId,
+    disciplina: validacao.discCanon,
+    valor_atividade: atv.valor_atividade,
+    descricao: atv.descricao,
     nota: vals.notaNum,
-    descricao: descricao?.trim() || null,
     professor_id: userId,
   });
 
   if (insertErr) {
-    if (insertErr.message?.includes("notas_disciplinas") || insertErr.message?.includes("valor_atividade")) {
+    if (insertErr.message?.includes("atividade_id") || insertErr.message?.includes("atividades_turma")) {
       return res.status(400).json({
         ok: false,
-        mensagem: "Execute supabase/migracao-notas-valor-atividade.sql no Supabase.",
+        mensagem: "Execute supabase/migracao-atividades-turma.sql no Supabase.",
       });
     }
     return res.status(400).json({ ok: false, mensagem: insertErr.message });
   }
 
-  const desc = descricao?.trim();
   return res.json({
     ok: true,
-    mensagem: `Nota ${vals.notaNum}/${vals.valorAtvNum} lançada em ${discCanon}${desc ? ` (${desc})` : ""}.`,
+    mensagem: `Nota ${vals.notaNum}/${atv.valor_atividade} lançada em ${validacao.discCanon} — ${atv.descricao}.`,
   });
 }
 
 async function editarNota(admin, userId, perfil, body, res) {
-  const { notaId, nota, descricao, valorAtividade } = body;
+  const { notaId, nota } = body;
   const validacao = await validarNotaProfessor(admin, userId, perfil, notaId);
   if (!validacao.ok) {
     return res.status(validacao.status).json({ ok: false, mensagem: validacao.mensagem });
   }
 
-  const vals = validarValoresNota(valorAtividade, nota);
+  const valorMax = validacao.nota.valor_atividade;
+  const vals = validarNotaAluno(nota, valorMax);
   if (!vals.ok) return res.status(400).json({ ok: false, mensagem: vals.mensagem });
 
-  const { error: updateErr } = await admin
-    .from("notas_disciplinas")
-    .update({
-      valor_atividade: vals.valorAtvNum,
-      nota: vals.notaNum,
-      descricao: descricao?.trim() || null,
-    })
-    .eq("id", notaId);
-
+  const { error: updateErr } = await admin.from("notas_disciplinas").update({ nota: vals.notaNum }).eq("id", notaId);
   if (updateErr) return res.status(400).json({ ok: false, mensagem: updateErr.message });
 
-  const desc = descricao?.trim();
+  const desc = validacao.nota.descricao ? ` — ${validacao.nota.descricao}` : "";
   return res.json({
     ok: true,
-    mensagem: `Atividade atualizada: ${vals.notaNum}/${vals.valorAtvNum} em ${validacao.discCanon}${desc ? ` (${desc})` : ""}.`,
+    mensagem: `Nota atualizada: ${vals.notaNum}/${valorMax} em ${validacao.discCanon}${desc}.`,
   });
 }
 
@@ -125,7 +228,7 @@ async function excluirNota(admin, userId, perfil, body, res) {
   const desc = n.descricao ? ` (${n.descricao})` : "";
   return res.json({
     ok: true,
-    mensagem: `Atividade excluída: ${n.nota}/${n.valor_atividade} em ${validacao.discCanon}${desc}.`,
+    mensagem: `Nota excluída: ${n.nota}/${n.valor_atividade} em ${validacao.discCanon}${desc}.`,
   });
 }
 
@@ -139,6 +242,9 @@ module.exports = async (req, res) => {
   const body = await parseBody(req);
   const acao = body.acao || "lancar";
 
+  if (acao === "criar-atividade") return criarAtividade(admin, userId, perfil, body, res);
+  if (acao === "editar-atividade") return editarAtividade(admin, userId, perfil, body, res);
+  if (acao === "excluir-atividade") return excluirAtividade(admin, userId, perfil, body, res);
   if (acao === "lancar") return lancarNota(admin, userId, perfil, body, res);
   if (acao === "editar") return editarNota(admin, userId, perfil, body, res);
   if (acao === "excluir") return excluirNota(admin, userId, perfil, body, res);

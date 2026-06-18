@@ -4,11 +4,22 @@ const { listaDisciplinas } = require("../_lib/disciplinas");
 function mapNotas(notas) {
   return (notas || []).map((n) => ({
     id: n.id,
+    atividadeId: n.atividade_id,
     disciplina: n.disciplina,
     nota: n.nota,
     valorAtividade: n.valor_atividade,
     descricao: n.descricao,
     createdAt: n.created_at,
+  }));
+}
+
+function mapAtividades(atividades) {
+  return (atividades || []).map((a) => ({
+    id: a.id,
+    disciplina: a.disciplina,
+    descricao: a.descricao,
+    valorAtividade: a.valor_atividade,
+    createdAt: a.created_at,
   }));
 }
 
@@ -32,7 +43,7 @@ async function buscarRegistrosTurma(admin, turmaId) {
   const completo = `
     id, faltas, perfil_id,
     perfil:perfis(nome, cpf),
-    notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at),
+    notas_disciplinas(id, atividade_id, disciplina, valor_atividade, nota, descricao, created_at),
     faltas_disciplinas(disciplina, faltas)
   `;
   const semFaltas = `
@@ -126,6 +137,15 @@ module.exports = async (req, res) => {
 
     if (!aulasErr) aulasDisciplinas = mapAulas(aulasRows);
 
+    let atividades = [];
+    const { data: atvRows, error: atvErr } = await admin
+      .from("atividades_turma")
+      .select("id, disciplina, descricao, valor_atividade, created_at")
+      .eq("turma_id", t.id)
+      .order("created_at", { ascending: false });
+
+    if (!atvErr) atividades = mapAtividades(atvRows);
+
     const alunos = (registros || []).map((r) => {
       const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
       return {
@@ -144,6 +164,7 @@ module.exports = async (req, res) => {
       professorNome: perfil.nome,
       professorDisciplinas: perfil.disciplina,
       aulasDisciplinas,
+      atividades,
       alunos,
     });
   }
