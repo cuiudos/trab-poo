@@ -1090,7 +1090,8 @@ async function salvarNotaEdicao() {
   if (Number.isNaN(nota) || nota < 0 || nota > valorAtividade) {
     throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
   }
-  const r = await adminPost("/api/professor/editar-nota", {
+  const r = await adminPost("/api/professor/notas", {
+    acao: "editar",
     notaId,
     valorAtividade,
     nota,
@@ -1135,7 +1136,7 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       if (!nota) throw new Error("Atividade não encontrada.");
       const rotulo = nota.descricao ? `"${nota.descricao}"` : "esta atividade";
       if (!confirm(`Excluir ${rotulo} (${nota.nota}/${nota.valorAtividade ?? 10})?`)) return;
-      const r = await adminPost("/api/professor/excluir-nota", { notaId: nota.id });
+      const r = await adminPost("/api/professor/notas", { acao: "excluir", notaId: nota.id });
       if (!r.ok) throw new Error(r.mensagem || "Não foi possível excluir a atividade.");
       toast(r.mensagem || "Atividade excluída!");
       await carregarTurmaProfessor();
@@ -1183,7 +1184,8 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
         throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
       }
 
-      const r = await adminPost("/api/professor/lancar-nota", {
+      const r = await adminPost("/api/professor/notas", {
+        acao: "lancar",
         registroId,
         disciplina,
         valorAtividade,
