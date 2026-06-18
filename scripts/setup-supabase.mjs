@@ -76,7 +76,7 @@ const usuarios = [
     nome: "Danton Rodrigues Diniz",
     cpf: "22222222222",
     role: "professor",
-    disciplina: "Matemática",
+    disciplina: "Matemática, Física",
     aliases: ["profesor2"],
   },
   {

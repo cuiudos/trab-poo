@@ -215,6 +215,34 @@ async function verificarSessao() {
 }
 
 let cacheUsuariosPorId = null;
+let usuariosLista = [];
+
+function listaDisciplinas(valor) {
+  if (!valor) return [];
+  return String(valor)
+    .split(/[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function renderDisciplinasHtml(valor) {
+  const lista = listaDisciplinas(valor);
+  if (!lista.length) return "—";
+  return lista.map((d) => `<span class="disciplina-tag">${escapeHtml(d)}</span>`).join("");
+}
+
+function infoExtraUsuario(u) {
+  if (u.role === "professor") {
+    const disc = u.disciplinas?.length ? u.disciplinas : listaDisciplinas(u.disciplina);
+    const turmas = u.turmasProfessor?.length ? u.turmasProfessor.join(", ") : null;
+    const partes = [];
+    if (disc.length) partes.push(disc.join(", "));
+    if (turmas) partes.push(`Turmas: ${turmas}`);
+    return partes.join(" · ") || "—";
+  }
+  if (u.role === "aluno") return u.turmaAluno || "Sem turma";
+  return "—";
+}
 
 async function obterUsuariosPorId() {
   if (!cacheUsuariosPorId) {
@@ -230,6 +258,10 @@ function invalidarCacheUsuarios() {
 
 async function listarTurmasCompletas() {
   const usuarios = perfilAtual === "diretor" ? await obterUsuariosPorId() : new Map();
+  if (perfilAtual === "professor") {
+    const { data: me } = await supabaseClient.from("perfis").select("disciplina").eq("id", userId).single();
+    if (me) usuarios.set(userId, { disciplina: me.disciplina });
+  }
   const { data: turmas, error: turmaErr } = await supabaseClient
     .from("turmas")
     .select("id, nome, professor_id")
@@ -279,6 +311,7 @@ async function listarTurmasCompletas() {
       professorId: t.professor_id,
       professorNome,
       professorLogin: t.professor_id ? usuarios.get(t.professor_id)?.login : null,
+      professorDisciplinas: t.professor_id ? usuarios.get(t.professor_id)?.disciplina : null,
       alunos,
     });
   }
@@ -286,7 +319,7 @@ async function listarTurmasCompletas() {
   return resultado;
 }
 
-function renderTurmas(container, turmas, comSelect = false) {
+function renderTurmas(container, turmas, comSelect = false, modoDiretor = false) {
   if (!turmas?.length) {
     container.innerHTML = "<p>Nenhuma turma cadastrada.</p>";
     return;
@@ -307,10 +340,22 @@ function renderTurmas(container, turmas, comSelect = false) {
           : escapeHtml(t.professorNome)
         : "Não vinculado";
 
+      const discHtml = t.professorDisciplinas
+        ? `<p class="meta">Disciplinas: ${renderDisciplinasHtml(t.professorDisciplinas)}</p>`
+        : "";
+
+      const btnExcluir = modoDiretor
+        ? `<button type="button" class="btn-danger btn-sm" data-acao="excluir-turma" data-turma-id="${t.id}" data-turma-nome="${escapeHtml(t.nome)}">Excluir</button>`
+        : "";
+
       return `
       <div class="turma-bloco" data-turma-id="${t.id}">
-        <h4>${escapeHtml(t.nome)}</h4>
+        <div class="turma-head">
+          <h4>${escapeHtml(t.nome)}</h4>
+          ${btnExcluir}
+        </div>
         <p class="meta">Professor: ${profInfo}</p>
+        ${discHtml}
         ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Nota</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
@@ -357,29 +402,56 @@ async function listarTodosUsuarios() {
 }
 
 function renderUsuarios(container, usuarios) {
-  if (!usuarios?.length) {
+  usuariosLista = usuarios || [];
+  if (!usuariosLista.length) {
     container.innerHTML = "<p>Nenhum usuário cadastrado.</p>";
     return;
   }
 
-  const rows = usuarios
-    .map(
-      (u) => `
-      <tr>
+  const rows = usuariosLista
+    .map((u) => {
+      const podeExcluir = u.id !== userId;
+      return `
+      <tr data-user-id="${u.id}">
         <td><code class="login-cell">${escapeHtml(u.login || "—")}</code></td>
         <td>${escapeHtml(u.nome)}</td>
+        <td>${escapeHtml(u.cpf || "—")}</td>
         <td><span class="badge-role badge-role-${escapeHtml(u.role)}">${escapeHtml(labelPerfil(u.role))}</span></td>
-      </tr>`
-    )
+        <td>${u.role === "professor" ? renderDisciplinasHtml(u.disciplina) : "—"}</td>
+        <td>${escapeHtml(infoExtraUsuario(u))}</td>
+        <td class="col-acoes acoes-linha">
+          <button type="button" class="btn-editar" data-acao="editar-usuario" data-user-id="${u.id}">Editar</button>
+          ${podeExcluir ? `<button type="button" class="btn-danger" data-acao="excluir-usuario" data-user-id="${u.id}" data-user-nome="${escapeHtml(u.nome)}">Excluir</button>` : ""}
+        </td>
+      </tr>`;
+    })
     .join("");
 
   container.innerHTML = `
     <table class="tabela-alunos tabela-usuarios">
       <thead>
-        <tr><th>Login</th><th>Nome</th><th>Perfil</th></tr>
+        <tr><th>Login</th><th>Nome</th><th>CPF</th><th>Perfil</th><th>Disciplinas</th><th>Detalhes</th><th>Ações</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+function abrirModalEditar(usuario) {
+  $("#edit-user-id").value = usuario.id;
+  $("#edit-user-role").value = usuario.role;
+  $("#edit-nome").value = usuario.nome || "";
+  $("#edit-cpf").value = usuario.cpf || "";
+  $("#edit-senha").value = "";
+  $("#edit-disciplinas").value = (usuario.disciplinas || listaDisciplinas(usuario.disciplina)).join(", ");
+  $("#edit-turma").value = usuario.turmaAluno || "";
+  $("#edit-campo-disciplinas").hidden = usuario.role !== "professor";
+  $("#edit-campo-turma").hidden = usuario.role !== "aluno";
+  $("#modal-titulo").textContent = `Editar ${labelPerfil(usuario.role).toLowerCase()}`;
+  $("#modal-editar-usuario").hidden = false;
+}
+
+function fecharModalEditar() {
+  $("#modal-editar-usuario").hidden = true;
 }
 
 async function carregarUsuariosDiretor() {
@@ -387,6 +459,7 @@ async function carregarUsuariosDiretor() {
   if (!container) return;
   container.innerHTML = "<p class='meta'>Carregando usuários…</p>";
   try {
+    invalidarCacheUsuarios();
     renderUsuarios(container, await listarTodosUsuarios());
   } catch (e) {
     container.innerHTML = `<p class="alert">${escapeHtml(e.message)}</p>`;
@@ -396,7 +469,8 @@ async function carregarUsuariosDiretor() {
 
 async function carregarTurmasDiretor() {
   try {
-    renderTurmas($("#dir-lista-turmas"), await listarTurmasCompletas());
+    invalidarCacheUsuarios();
+    renderTurmas($("#dir-lista-turmas"), await listarTurmasCompletas(), false, true);
   } catch (e) {
     toast(e.message);
   }
@@ -407,6 +481,63 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
   if (!acao) return;
 
   try {
+    if (acao === "editar-usuario") {
+      const u = usuariosLista.find((x) => x.id === e.target.dataset.userId);
+      if (u) abrirModalEditar(u);
+      return;
+    }
+
+    if (acao === "excluir-usuario") {
+      const id = e.target.dataset.userId;
+      const nome = e.target.dataset.userNome;
+      if (!confirm(`Excluir o usuário "${nome}"? Esta ação não pode ser desfeita.`)) return;
+      const r = await adminPost("/api/admin/excluir-usuario", { id });
+      if (!r.ok) throw new Error(r.mensagem);
+      invalidarCacheUsuarios();
+      toast(r.mensagem);
+      await carregarUsuariosDiretor();
+      await carregarTurmasDiretor();
+      return;
+    }
+
+    if (acao === "excluir-turma") {
+      const turmaId = e.target.dataset.turmaId;
+      const turmaNome = e.target.dataset.turmaNome;
+      if (!confirm(`Excluir a turma "${turmaNome}"? Alunos serão desvinculados.`)) return;
+      const { error } = await supabaseClient.from("turmas").delete().eq("id", turmaId).eq("escola_id", escolaId);
+      if (error) throw error;
+      toast("Turma excluída!");
+      await carregarTurmasDiretor();
+      return;
+    }
+
+    if (acao === "fechar-modal") {
+      fecharModalEditar();
+      return;
+    }
+
+    if (acao === "salvar-edicao") {
+      const id = $("#edit-user-id").value;
+      const role = $("#edit-user-role").value;
+      const body = {
+        id,
+        nome: $("#edit-nome").value,
+        cpf: $("#edit-cpf").value,
+      };
+      if (role === "professor") body.disciplina = $("#edit-disciplinas").value;
+      if (role === "aluno") body.turmaNome = $("#edit-turma").value;
+      const senha = $("#edit-senha").value;
+      if (senha) body.password = senha;
+      const r = await adminPost("/api/admin/editar-usuario", body);
+      if (!r.ok) throw new Error(r.mensagem);
+      invalidarCacheUsuarios();
+      fecharModalEditar();
+      toast(r.mensagem);
+      await carregarUsuariosDiretor();
+      await carregarTurmasDiretor();
+      return;
+    }
+
     if (acao === "cad-turma") {
       const { error } = await supabaseClient
         .from("turmas")

@@ -1,56 +1,46 @@
-const { createClient } = require("@supabase/supabase-js");
+const { verificarDiretor } = require("../_lib/auth-diretor");
 const { emailParaLogin } = require("../_lib/email");
+const { listaDisciplinas } = require("../_lib/disciplinas");
+
+function extrairTurmaAluno(registros) {
+  const reg = Array.isArray(registros) ? registros[0] : registros;
+  return reg?.turma?.nome || null;
+}
+
+function extrairTurmasProfessor(turmas) {
+  const lista = Array.isArray(turmas) ? turmas : turmas ? [turmas] : [];
+  return lista.map((t) => t.nome).filter(Boolean);
+}
 
 module.exports = async (req, res) => {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false });
 
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const auth = await verificarDiretor(req);
+  if (!auth.ok) return res.status(auth.status).json({ ok: false, mensagem: auth.mensagem });
 
-  if (!url || !anonKey || !serviceKey) {
-    return res.status(500).json({ ok: false, mensagem: "Supabase não configurado no servidor." });
-  }
-
-  if (!token) return res.status(401).json({ ok: false, mensagem: "Sessão inválida." });
-
-  const userClient = createClient(url, anonKey);
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userData, error: userErr } = await userClient.auth.getUser(token);
-  if (userErr || !userData?.user) {
-    return res.status(401).json({ ok: false, mensagem: "Sessão expirada. Faça login novamente." });
-  }
-
-  const { data: diretor, error: perfilErr } = await admin
+  const { data: perfis, error: listaErr } = await auth.admin
     .from("perfis")
-    .select("role, escola_id")
-    .eq("id", userData.user.id)
-    .single();
-
-  if (perfilErr || diretor?.role !== "diretor") {
-    return res.status(403).json({ ok: false, mensagem: "Apenas o diretor pode listar usuários." });
-  }
-
-  const { data: perfis, error: listaErr } = await admin
-    .from("perfis")
-    .select("id, nome, cpf, role, disciplina")
-    .eq("escola_id", diretor.escola_id)
+    .select(`
+      id, nome, cpf, role, disciplina,
+      registros_alunos ( turma:turmas ( nome ) ),
+      turmas ( nome )
+    `)
+    .eq("escola_id", auth.escolaId)
     .order("role")
     .order("nome");
 
   if (listaErr) return res.status(400).json({ ok: false, mensagem: listaErr.message });
 
-  const { data: authList, error: authErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const { data: authList, error: authErr } = await auth.admin.auth.admin.listUsers({ perPage: 1000 });
   if (authErr) return res.status(400).json({ ok: false, mensagem: authErr.message });
 
   const emailPorId = new Map((authList?.users || []).map((u) => [u.id, u.email]));
 
   const usuarios = (perfis || []).map((p) => {
     const email = emailPorId.get(p.id) || null;
+    const disciplinas = listaDisciplinas(p.disciplina);
+    const turmasProfessor = extrairTurmasProfessor(p.turmas);
+
     return {
       id: p.id,
       nome: p.nome,
@@ -59,6 +49,9 @@ module.exports = async (req, res) => {
       cpf: p.cpf,
       role: p.role,
       disciplina: p.disciplina,
+      disciplinas,
+      turmaAluno: extrairTurmaAluno(p.registros_alunos),
+      turmasProfessor,
     };
   });
 

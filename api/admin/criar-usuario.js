@@ -1,41 +1,13 @@
-const { createClient } = require("@supabase/supabase-js");
 const { parseBody } = require("../_lib/body");
 const { normalizarEmail } = require("../_lib/email");
+const { normalizarDisciplinas } = require("../_lib/disciplinas");
+const { verificarDiretor } = require("../_lib/auth-diretor");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
 
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !anonKey || !serviceKey) {
-    return res.status(500).json({ ok: false, mensagem: "Supabase não configurado no servidor." });
-  }
-
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (!token) return res.status(401).json({ ok: false, mensagem: "Sessão inválida." });
-
-  const userClient = createClient(url, anonKey);
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userData, error: userErr } = await userClient.auth.getUser(token);
-  if (userErr || !userData?.user) {
-    return res.status(401).json({ ok: false, mensagem: "Sessão expirada. Faça login novamente." });
-  }
-
-  const { data: perfilDiretor, error: perfilErr } = await admin
-    .from("perfis")
-    .select("role, escola_id")
-    .eq("id", userData.user.id)
-    .single();
-
-  if (perfilErr || perfilDiretor?.role !== "diretor") {
-    return res.status(403).json({ ok: false, mensagem: "Apenas o diretor pode criar usuários." });
-  }
+  const auth = await verificarDiretor(req);
+  if (!auth.ok) return res.status(auth.status).json({ ok: false, mensagem: auth.mensagem });
 
   const body = await parseBody(req);
   const { email, password, nome, cpf, role, disciplina, turmaNome } = body;
@@ -49,7 +21,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ ok: false, mensagem: "Senha deve ter no mínimo 8 caracteres." });
   }
 
-  const { data: novoAuth, error: createErr } = await admin.auth.admin.createUser({
+  const { data: novoAuth, error: createErr } = await auth.admin.auth.admin.createUser({
     email: emailNormalizado,
     password,
     email_confirm: true,
@@ -61,25 +33,25 @@ module.exports = async (req, res) => {
 
   const userId = novoAuth.user.id;
 
-  const { error: perfilInsertErr } = await admin.from("perfis").insert({
+  const { error: perfilInsertErr } = await auth.admin.from("perfis").insert({
     id: userId,
-    escola_id: perfilDiretor.escola_id,
+    escola_id: auth.escolaId,
     nome: nome.trim(),
     cpf: cpf || null,
     role,
-    disciplina: role === "professor" ? disciplina : null,
+    disciplina: role === "professor" ? normalizarDisciplinas(disciplina) : null,
   });
 
   if (perfilInsertErr) {
-    await admin.auth.admin.deleteUser(userId);
+    await auth.admin.auth.admin.deleteUser(userId);
     return res.status(400).json({ ok: false, mensagem: perfilInsertErr.message });
   }
 
   if (role === "aluno" && turmaNome) {
-    const { data: turma } = await admin
+    const { data: turma } = await auth.admin
       .from("turmas")
       .select("id")
-      .eq("escola_id", perfilDiretor.escola_id)
+      .eq("escola_id", auth.escolaId)
       .eq("nome", turmaNome.trim())
       .maybeSingle();
 
@@ -87,7 +59,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, mensagem: "Turma não encontrada." });
     }
 
-    await admin.from("registros_alunos").insert({
+    await auth.admin.from("registros_alunos").insert({
       perfil_id: userId,
       turma_id: turma.id,
     });
