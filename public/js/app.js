@@ -283,6 +283,46 @@ function invalidarCacheUsuarios() {
   cacheUsuariosPorId = null;
 }
 
+async function buscarRegistrosTurma(turmaId) {
+  const comNotas =
+    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, nota, descricao, created_at)";
+  const semNotas = "id, faltas, perfil_id, perfil:perfis(nome, cpf)";
+
+  let result = await supabaseClient.from("registros_alunos").select(comNotas).eq("turma_id", turmaId);
+
+  if (result.error) {
+    const msg = result.error.message || "";
+    const semTabelaNotas =
+      msg.includes("notas_disciplinas") ||
+      msg.includes("relationship") ||
+      result.error.code === "PGRST200";
+    if (semTabelaNotas) {
+      result = await supabaseClient.from("registros_alunos").select(semNotas).eq("turma_id", turmaId);
+    }
+  }
+
+  return result;
+}
+
+function mapRegistrosParaAlunos(registros) {
+  return (registros || []).map((r) => {
+    const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
+    const notas = (r.notas_disciplinas || []).map((n) => ({
+      disciplina: n.disciplina,
+      nota: n.nota,
+      descricao: n.descricao,
+    }));
+    return {
+      registroId: r.id,
+      perfilId: r.perfil_id,
+      nome: p?.nome || "Aluno",
+      cpf: p?.cpf || "",
+      faltas: r.faltas,
+      notasDisciplinas: notas,
+    };
+  });
+}
+
 async function listarTurmasCompletas() {
   const usuarios = perfilAtual === "diretor" ? await obterUsuariosPorId() : new Map();
   if (perfilAtual === "professor") {
@@ -310,29 +350,10 @@ async function listarTurmasCompletas() {
       professorNome = prof?.nome;
     }
 
-    const { data: registros } = await supabaseClient
-      .from("registros_alunos")
-      .select(
-        "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, nota, descricao, created_at)"
-      )
-      .eq("turma_id", t.id);
+    const { data: registros, error: regErr } = await buscarRegistrosTurma(t.id);
+    if (regErr) throw regErr;
 
-    const alunos = (registros || []).map((r) => {
-      const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
-      const notas = (r.notas_disciplinas || []).map((n) => ({
-        disciplina: n.disciplina,
-        nota: n.nota,
-        descricao: n.descricao,
-      }));
-      return {
-        registroId: r.id,
-        perfilId: r.perfil_id,
-        nome: p?.nome,
-        cpf: p?.cpf,
-        faltas: r.faltas,
-        notasDisciplinas: notas,
-      };
-    });
+    const alunos = mapRegistrosParaAlunos(registros);
 
     resultado.push({
       id: t.id,
@@ -688,6 +709,10 @@ async function carregarTurmaProfessor() {
   let turmas = r.ok ? r.turmas : null;
   let disciplinasProfessor = r.ok ? r.disciplinas || [] : [];
 
+  if (!r.ok && r.mensagem) {
+    console.warn("minhas-turmas:", r.mensagem);
+  }
+
   if (!turmas) {
     const { data: turmasDb, error } = await supabaseClient
       .from("turmas")
@@ -778,11 +803,32 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 
 async function carregarDadosAluno() {
   const card = $("#aluno-card");
-  const { data: reg, error } = await supabaseClient
+  let reg = null;
+  let error = null;
+
+  const comNotas = await supabaseClient
     .from("registros_alunos")
     .select("faltas, turma:turmas(nome), notas_disciplinas(disciplina, nota, descricao)")
     .eq("perfil_id", userId)
     .maybeSingle();
+
+  if (comNotas.error) {
+    const msg = comNotas.error.message || "";
+    const semTabelaNotas = msg.includes("notas_disciplinas") || msg.includes("relationship");
+    if (semTabelaNotas) {
+      const semNotas = await supabaseClient
+        .from("registros_alunos")
+        .select("faltas, turma:turmas(nome)")
+        .eq("perfil_id", userId)
+        .maybeSingle();
+      reg = semNotas.data;
+      error = semNotas.error;
+    } else {
+      error = comNotas.error;
+    }
+  } else {
+    reg = comNotas.data;
+  }
 
   if (error || !reg) {
     card.innerHTML = `<p class="alert">Registro acadêmico não encontrado.</p>`;

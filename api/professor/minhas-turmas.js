@@ -11,6 +11,33 @@ function mapNotas(notas) {
   }));
 }
 
+async function buscarRegistrosTurma(admin, turmaId) {
+  const comNotas = `
+    id, faltas, perfil_id,
+    perfil:perfis(nome, cpf),
+    notas_disciplinas(id, disciplina, nota, descricao, created_at)
+  `;
+  const semNotas = `
+    id, faltas, perfil_id,
+    perfil:perfis(nome, cpf)
+  `;
+
+  let result = await admin.from("registros_alunos").select(comNotas).eq("turma_id", turmaId);
+
+  if (result.error) {
+    const msg = result.error.message || "";
+    const semTabelaNotas =
+      msg.includes("notas_disciplinas") ||
+      msg.includes("relationship") ||
+      result.error.code === "PGRST200";
+    if (semTabelaNotas) {
+      result = await admin.from("registros_alunos").select(semNotas).eq("turma_id", turmaId);
+    }
+  }
+
+  return result;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false });
 
@@ -60,22 +87,9 @@ module.exports = async (req, res) => {
   const resultado = [];
 
   for (const t of turmas || []) {
-    const { data: registros, error: regErr } = await admin
-      .from("registros_alunos")
-      .select(`
-        id, faltas, perfil_id,
-        perfil:perfis(nome, cpf),
-        notas_disciplinas(id, disciplina, nota, descricao, created_at)
-      `)
-      .eq("turma_id", t.id);
+    const { data: registros, error: regErr } = await buscarRegistrosTurma(admin, t.id);
 
     if (regErr) {
-      if (regErr.message?.includes("notas_disciplinas")) {
-        return res.status(400).json({
-          ok: false,
-          mensagem: "Execute supabase/migracao-notas-disciplinas.sql no Supabase.",
-        });
-      }
       return res.status(400).json({ ok: false, mensagem: regErr.message });
     }
 
