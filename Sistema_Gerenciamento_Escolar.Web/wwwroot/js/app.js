@@ -222,6 +222,7 @@ async function verificarSessao() {
 let cacheUsuariosPorId = null;
 let usuariosLista = [];
 let turmasProfessorCache = [];
+let disciplinasProfessorCache = [];
 
 function listaDisciplinas(valor) {
   if (!valor) return [];
@@ -246,6 +247,72 @@ function formatNotasHtml(notas) {
       return `<div class="nota-item"><strong>${escapeHtml(n.disciplina)}</strong>: ${n.nota} / ${max}${desc}</div>`;
     })
     .join("");
+}
+
+function notasDaDisciplina(notas, disciplina) {
+  return (notas || []).filter((n) => n.disciplina === disciplina);
+}
+
+function encontrarNotaPorId(notaId) {
+  for (const t of turmasProfessorCache || []) {
+    for (const a of t.alunos || []) {
+      const n = (a.notasDisciplinas || []).find((x) => x.id === notaId);
+      if (n) return n;
+    }
+  }
+  return null;
+}
+
+function formatNotasProfessorHtml(notas, disciplina) {
+  const lista = notasDaDisciplina(notas, disciplina);
+  if (!lista.length) return "—";
+  return lista
+    .map((n) => {
+      const max = n.valorAtividade ?? 100;
+      const desc = n.descricao ? ` — ${escapeHtml(n.descricao)}` : "";
+      return `<div class="nota-item nota-item-editavel">
+        <span class="nota-texto">${n.nota} / ${max}${desc}</span>
+        <span class="nota-acoes">
+          <button type="button" class="btn-icon btn-sm" data-acao="editar-nota" data-nota-id="${n.id}" title="Editar">✎</button>
+          <button type="button" class="btn-icon btn-icon-danger btn-sm" data-acao="excluir-nota" data-nota-id="${n.id}" title="Excluir">✕</button>
+        </span>
+      </div>`;
+    })
+    .join("");
+}
+
+function calcularSituacaoDisciplina(notas, faltasDisciplinas, aulasDisciplinas, disciplina) {
+  const notaRes = calcularResultadoFinal(notasDaDisciplina(notas, disciplina));
+  let reprovadoFalta = false;
+  const totalAulas = aulasDisciplinas?.[disciplina];
+  if (totalAulas) {
+    const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disciplina] || 0, totalAulas);
+    if (calc?.reprovadoFalta) reprovadoFalta = true;
+  }
+
+  let situacaoFinal = null;
+  const passNota = notaRes.percentual === null ? null : notaRes.percentual >= 60;
+  if (passNota === false) situacaoFinal = "Reprovado (nota)";
+  else if (reprovadoFalta) situacaoFinal = "Reprovado (falta)";
+  else if (passNota === true) situacaoFinal = "Aprovado";
+
+  return { ...notaRes, situacaoFinal, reprovadoFalta };
+}
+
+function formatSituacaoDisciplinaHtml(notas, faltasDisciplinas, aulasDisciplinas, disciplina) {
+  const r = calcularSituacaoDisciplina(notas, faltasDisciplinas, aulasDisciplinas, disciplina);
+  if (!r.situacaoFinal) return "—";
+  const cls = r.situacaoFinal.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
+  return `<span class="badge-situacao ${cls}">${r.situacaoFinal}</span>`;
+}
+
+function formatFrequenciaDisciplinaHtml(faltasDisciplinas, aulasDisciplinas, disciplina) {
+  const total = aulasDisciplinas?.[disciplina];
+  if (!total) return `<span class="meta">Cadastre as aulas</span>`;
+  const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disciplina] || 0, total);
+  if (!calc) return "—";
+  const cls = calc.reprovadoFalta ? "freq-reprovado" : "freq-ok";
+  return `<div class="freq-item ${cls}"><span class="freq-pct">${calc.percentualFaltas}% faltas</span> · ${calc.faltas}/${calc.totalAulas} aulas</div>`;
 }
 
 function calcularResultadoFinal(notas) {
@@ -403,9 +470,9 @@ function invalidarCacheUsuarios() {
 
 async function buscarRegistrosTurma(turmaId) {
   const completo =
-    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, valor_atividade, nota, descricao, created_at), faltas_disciplinas(disciplina, faltas)";
+    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at), faltas_disciplinas(disciplina, faltas)";
   const semFaltas =
-    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, valor_atividade, nota, descricao, created_at)";
+    "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(id, disciplina, valor_atividade, nota, descricao, created_at)";
   const semNotas = "id, faltas, perfil_id, perfil:perfis(nome, cpf)";
 
   let result = await supabaseClient.from("registros_alunos").select(completo).eq("turma_id", turmaId);
@@ -439,6 +506,7 @@ function mapRegistrosParaAlunos(registros) {
   return (registros || []).map((r) => {
     const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
     const notas = (r.notas_disciplinas || []).map((n) => ({
+      id: n.id,
       disciplina: n.disciplina,
       valorAtividade: n.valor_atividade,
       nota: n.nota,
@@ -504,6 +572,11 @@ async function listarTurmasCompletas() {
 }
 
 function renderTurmas(container, turmas, comSelect = false, modoDiretor = false) {
+  if (comSelect && !modoDiretor) {
+    renderTurmasProfessor(container, turmas);
+    return;
+  }
+
   if (!turmas?.length) {
     container.innerHTML = "<p>Nenhuma turma cadastrada.</p>";
     return;
@@ -571,6 +644,84 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
       $("#pr-nota-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
       $("#pr-falta-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
     }
+  }
+}
+
+function renderTurmasProfessor(container, turmas) {
+  if (!turmas?.length) {
+    container.innerHTML = "<p>Nenhuma turma cadastrada.</p>";
+    return;
+  }
+
+  const disciplinas = disciplinasProfessorCache.length
+    ? disciplinasProfessorCache
+    : listaDisciplinas(turmas[0]?.professorDisciplinas);
+
+  container.innerHTML = turmas
+    .map((t) => {
+      const aulas = t.aulasDisciplinas || {};
+      const discBlocos = disciplinas
+        .map((disc) => {
+          const rows = (t.alunos || [])
+            .map(
+              (a) =>
+                `<tr>
+                  <td>${escapeHtml(a.nome)}</td>
+                  <td>${escapeHtml(a.cpf || "")}</td>
+                  <td class="col-notas">${formatNotasProfessorHtml(a.notasDisciplinas, disc)}</td>
+                  <td class="col-total">${formatTotalHtml(notasDaDisciplina(a.notasDisciplinas, disc))}</td>
+                  <td class="col-freq">${formatFrequenciaDisciplinaHtml(a.faltasDisciplinas, aulas, disc)}</td>
+                  <td>${formatSituacaoDisciplinaHtml(a.notasDisciplinas, a.faltasDisciplinas, aulas, disc)}</td>
+                </tr>`
+            )
+            .join("");
+
+          const aulaInfo = aulas[disc]
+            ? `<span class="meta disc-aulas-info">${aulas[disc]} aulas dadas</span>`
+            : `<span class="meta disc-aulas-info">Aulas não cadastradas</span>`;
+
+          return `
+          <div class="disc-bloco">
+            <div class="disc-bloco-head">
+              <h5>${escapeHtml(disc)}</h5>
+              ${aulaInfo}
+            </div>
+            ${
+              rows
+                ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Atividades</th><th>Total</th><th>% Faltas</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>`
+                : "<p class='meta'>Sem alunos</p>"
+            }
+          </div>`;
+        })
+        .join("");
+
+      return `
+      <div class="turma-bloco" data-turma-id="${t.id}">
+        <div class="turma-head">
+          <h4>${escapeHtml(t.nome)}</h4>
+        </div>
+        <p class="meta">Disciplinas: ${renderDisciplinasHtml(t.professorDisciplinas || disciplinas.join(", "))}</p>
+        <div class="disciplinas-grid">${discBlocos}</div>
+      </div>`;
+    })
+    .join("");
+
+  const alunos = turmas
+    .flatMap((t) => (t.alunos || []).map((a) => ({ ...a, turmaNome: t.nome })))
+    .filter((a) => a.registroId);
+
+  if (alunos.length) {
+    const opts = alunos
+      .map((a) => {
+        const label = a.turmaNome ? `${a.nome} (${a.turmaNome})` : a.nome;
+        return `<option value="${a.registroId}">${escapeHtml(label || "Aluno")}</option>`;
+      })
+      .join("");
+    $("#pr-nota-aluno").innerHTML = opts;
+    $("#pr-falta-aluno").innerHTML = opts;
+  } else {
+    $("#pr-nota-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
+    $("#pr-falta-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
   }
 }
 
@@ -883,6 +1034,7 @@ async function carregarTurmaProfessor() {
     turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
   turmasProfessorCache = turmas;
+  disciplinasProfessorCache = disciplinasProfessor;
   popularSelectsDisciplinas(disciplinasProfessor);
   popularSelectTurmasAulas(turmas);
   atualizarMaxNotaAluno();
@@ -894,11 +1046,107 @@ if (prNotaValorAtv) {
   prNotaValorAtv.addEventListener("input", atualizarMaxNotaAluno);
 }
 
+const editNotaValorAtv = $("#edit-nota-valor-atv");
+if (editNotaValorAtv) {
+  editNotaValorAtv.addEventListener("input", atualizarMaxNotaEditModal);
+}
+
+function atualizarMaxNotaEditModal() {
+  const atv = parseFloat($("#edit-nota-valor-atv")?.value);
+  const inputNota = $("#edit-nota-valor");
+  if (!inputNota) return;
+  const max = Number.isNaN(atv) || atv <= 0 ? 100 : Math.min(atv, 100);
+  inputNota.max = max;
+  inputNota.placeholder = `Nota do aluno (0 a ${max})`;
+}
+
+function abrirModalEditarNota(nota) {
+  $("#edit-nota-id").value = nota.id;
+  $("#edit-nota-disciplina-label").textContent = nota.disciplina;
+  $("#edit-nota-valor-atv").value = nota.valorAtividade ?? 10;
+  $("#edit-nota-valor").value = nota.nota;
+  $("#edit-nota-desc").value = nota.descricao || "";
+  atualizarMaxNotaEditModal();
+  $("#modal-editar-nota").hidden = false;
+}
+
+function fecharModalEditarNota() {
+  $("#modal-editar-nota").hidden = true;
+}
+
+async function salvarNotaEdicao() {
+  const notaId = $("#edit-nota-id").value;
+  const valorAtvVal = $("#edit-nota-valor-atv").value;
+  const notaVal = $("#edit-nota-valor").value;
+  const descricao = $("#edit-nota-desc").value.trim();
+  if (!notaId) throw new Error("Atividade inválida.");
+  if (valorAtvVal === "") throw new Error("Informe o valor da atividade.");
+  if (notaVal === "") throw new Error("Informe a nota do aluno.");
+  const valorAtividade = parseFloat(valorAtvVal);
+  const nota = parseFloat(notaVal);
+  if (Number.isNaN(valorAtividade) || valorAtividade <= 0 || valorAtividade > 100) {
+    throw new Error("Valor da atividade deve ser entre 1 e 100.");
+  }
+  if (Number.isNaN(nota) || nota < 0 || nota > valorAtividade) {
+    throw new Error(`Nota do aluno deve ser entre 0 e ${valorAtividade}.`);
+  }
+  const r = await adminPost("/api/professor/editar-nota", {
+    notaId,
+    valorAtividade,
+    nota,
+    descricao,
+  });
+  if (!r.ok) throw new Error(r.mensagem || "Não foi possível salvar a atividade.");
+  toast(r.mensagem || "Atividade atualizada!");
+  fecharModalEditarNota();
+  await carregarTurmaProfessor();
+}
+
+document.querySelector("#modal-editar-nota")?.addEventListener("click", async (e) => {
+  const acao = e.target.dataset?.acao;
+  if (!acao) return;
+  try {
+    if (acao === "fechar-modal-nota") fecharModalEditarNota();
+    else if (acao === "salvar-nota-edicao") await salvarNotaEdicao();
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 document.querySelector("#painel-professor").addEventListener("click", async (e) => {
   const acao = e.target.dataset?.acao;
   if (!acao) return;
 
   try {
+    if (acao === "fechar-modal-nota") {
+      fecharModalEditarNota();
+      return;
+    }
+
+    if (acao === "editar-nota") {
+      const nota = encontrarNotaPorId(e.target.dataset.notaId);
+      if (!nota) throw new Error("Atividade não encontrada.");
+      abrirModalEditarNota(nota);
+      return;
+    }
+
+    if (acao === "excluir-nota") {
+      const nota = encontrarNotaPorId(e.target.dataset.notaId);
+      if (!nota) throw new Error("Atividade não encontrada.");
+      const rotulo = nota.descricao ? `"${nota.descricao}"` : "esta atividade";
+      if (!confirm(`Excluir ${rotulo} (${nota.nota}/${nota.valorAtividade ?? 10})?`)) return;
+      const r = await adminPost("/api/professor/excluir-nota", { notaId: nota.id });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível excluir a atividade.");
+      toast(r.mensagem || "Atividade excluída!");
+      await carregarTurmaProfessor();
+      return;
+    }
+
+    if (acao === "salvar-nota-edicao") {
+      await salvarNotaEdicao();
+      return;
+    }
+
     if (acao === "definir-aulas") {
       const turmaId = $("#pr-aulas-turma").value;
       const disciplina = $("#pr-aulas-disciplina").value;

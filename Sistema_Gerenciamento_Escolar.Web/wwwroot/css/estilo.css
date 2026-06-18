@@ -330,6 +330,94 @@ body {
   padding: 0.15rem 0;
 }
 
+.nota-item-editavel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f0ebe6;
+}
+
+.nota-item-editavel:last-child {
+  border-bottom: none;
+}
+
+.nota-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.nota-acoes {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.btn-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #e5ddd6;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--verde);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  background: #f5f0eb;
+}
+
+.btn-icon-danger {
+  color: #a12828;
+}
+
+.btn-icon-danger:hover {
+  background: #fce8e8;
+}
+
+.disciplinas-grid {
+  display: grid;
+  gap: 1.75rem;
+  margin-top: 1.25rem;
+}
+
+.disc-bloco {
+  background: #faf8f6;
+  border: 1px solid #ebe4dc;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.disc-bloco-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.disc-bloco-head h5 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--verde);
+}
+
+.disc-aulas-info {
+  font-size: 0.85rem;
+}
+
+.modal-disc-label {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--verde);
+}
+
 .col-notas {
   min-width: 10rem;
   max-width: 22rem;

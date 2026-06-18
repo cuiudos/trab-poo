@@ -211,9 +211,35 @@
         </div>
       </div>
     </div>
+    <div id="modal-editar-nota" class="modal-overlay" hidden>
+      <div class="modal-card" role="dialog" aria-labelledby="modal-nota-titulo">
+        <div class="card-head">
+          <h3 id="modal-nota-titulo">Editar atividade</h3>
+          <button type="button" class="btn-ghost btn-sm" data-acao="fechar-modal-nota">✕</button>
+        </div>
+        <input type="hidden" id="edit-nota-id" />
+        <p id="edit-nota-disciplina-label" class="meta modal-disc-label"></p>
+        <label>
+          <span>Valor da atividade</span>
+          <input type="number" id="edit-nota-valor-atv" min="1" max="100" step="0.1" />
+        </label>
+        <label>
+          <span>Nota do aluno</span>
+          <input type="number" id="edit-nota-valor" step="0.1" min="0" />
+        </label>
+        <label>
+          <span>Descrição</span>
+          <input type="text" id="edit-nota-desc" maxlength="120" placeholder="Ex: Prova 1, Trabalho" />
+        </label>
+        <div class="modal-acoes">
+          <button type="button" class="btn-ghost" data-acao="fechar-modal-nota">Cancelar</button>
+          <button type="button" class="btn-primary" data-acao="salvar-nota-edicao">Salvar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=16"></script>
+  <script src="/js/app.js?v=17"></script>
 </body>
 </html>
