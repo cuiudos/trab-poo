@@ -504,9 +504,27 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
       const turmaId = e.target.dataset.turmaId;
       const turmaNome = e.target.dataset.turmaNome;
       if (!confirm(`Excluir a turma "${turmaNome}"? Alunos serão desvinculados.`)) return;
-      const { error } = await supabaseClient.from("turmas").delete().eq("id", turmaId).eq("escola_id", escolaId);
-      if (error) throw error;
-      toast("Turma excluída!");
+
+      const r = await adminPost("/api/admin/excluir-turma", { id: turmaId });
+      if (!r.ok) {
+        const { data, error } = await supabaseClient
+          .from("turmas")
+          .delete()
+          .eq("id", turmaId)
+          .eq("escola_id", escolaId)
+          .select("id");
+        if (error) throw error;
+        if (!data?.length) {
+          throw new Error(
+            "Sem permissão para excluir. Atualize o site na Vercel ou execute supabase/migracao-policies-delete.sql no Supabase."
+          );
+        }
+        toast("Turma excluída!");
+      } else {
+        toast(r.mensagem);
+      }
+
+      invalidarCacheUsuarios();
       await carregarTurmasDiretor();
       return;
     }
