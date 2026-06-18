@@ -1,3 +1,5 @@
+namespace Sistema_Gerenciamento_Escolar.Results;
+
 public class ResultadoAutenticacao
 {
     public bool Sucesso { get; init; }

@@ -1,3 +1,5 @@
+namespace Sistema_Gerenciamento_Escolar.Models;
+
 public class Diretor : DadosPessoais
 {
     public List<Turma> Turmas { get; set; }
@@ -8,7 +10,6 @@ public class Diretor : DadosPessoais
         Turmas = new List<Turma>();
         Professores = new List<Professor>();
     }
-
 
     public void CadastrarTurmma(string NomeTurma)
     {

@@ -1,7 +1,9 @@
+namespace Sistema_Gerenciamento_Escolar.Models;
+
 public class Professor : DadosPessoais
 {
     public string Disciplina { get; set; }
-    public Turma Turma { get; set; } // vínculo com a turma
+    public Turma Turma { get; set; }
 
     public Professor(string nome, string cpf, string disciplina) : base(nome, cpf)
     {

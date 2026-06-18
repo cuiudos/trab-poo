@@ -1,3 +1,5 @@
+namespace Sistema_Gerenciamento_Escolar.Models;
+
 public class Turma
 {
     public string Nome { get; set; }

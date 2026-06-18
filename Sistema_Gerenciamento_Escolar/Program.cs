@@ -1,4 +1,9 @@
-﻿class Program
+﻿using Sistema_Gerenciamento_Escolar.Enums;
+using Sistema_Gerenciamento_Escolar.Models;
+using Sistema_Gerenciamento_Escolar.Results;
+using Sistema_Gerenciamento_Escolar.Services;
+
+class Program
 {
     static void Main()
     {

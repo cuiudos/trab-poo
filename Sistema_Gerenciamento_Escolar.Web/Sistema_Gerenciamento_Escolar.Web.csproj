@@ -7,12 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Sistema_Gerenciamento_Escolar\*.cs" Exclude="..\Sistema_Gerenciamento_Escolar\Program.cs" Link="Core\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\Sistema_Gerenciamento_Escolar\Sistema_Gerenciamento_Escolar.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="usuarios.xml">
+    <None Update="Data\usuarios.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>usuarios.xml</Link>
     </None>
   </ItemGroup>
 

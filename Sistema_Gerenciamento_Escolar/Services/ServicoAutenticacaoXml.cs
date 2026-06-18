@@ -1,4 +1,8 @@
 using System.Xml.Linq;
+using Sistema_Gerenciamento_Escolar.Enums;
+using Sistema_Gerenciamento_Escolar.Results;
+
+namespace Sistema_Gerenciamento_Escolar.Services;
 
 public class ServicoAutenticacaoXml
 {

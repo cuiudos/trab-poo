@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Sistema_Gerenciamento_Escolar.Web.DTOs;
 
 namespace Sistema_Gerenciamento_Escolar.Web.Services;
 
@@ -29,33 +30,4 @@ public class PersistenciaEscolar
 
     public void Salvar(DadosEscolaDto dados) =>
         File.WriteAllText(_caminho, JsonSerializer.Serialize(dados, JsonOpts));
-}
-
-public class DadosEscolaDto
-{
-    public List<TurmaDto> Turmas { get; set; } = [];
-    public List<ProfessorDto> Professores { get; set; } = [];
-}
-
-public class TurmaDto
-{
-    public string Nome { get; set; } = "";
-    public string? ProfessorNome { get; set; }
-    public List<AlunoDto> Alunos { get; set; } = [];
-}
-
-public class ProfessorDto
-{
-    public string Nome { get; set; } = "";
-    public string Cpf { get; set; } = "";
-    public string Disciplina { get; set; } = "";
-    public string? TurmaNome { get; set; }
-}
-
-public class AlunoDto
-{
-    public string Nome { get; set; } = "";
-    public string Cpf { get; set; } = "";
-    public double Nota { get; set; }
-    public int Faltas { get; set; }
 }

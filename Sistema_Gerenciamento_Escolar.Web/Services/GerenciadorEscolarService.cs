@@ -1,3 +1,9 @@
+using Sistema_Gerenciamento_Escolar.Enums;
+using Sistema_Gerenciamento_Escolar.Models;
+using Sistema_Gerenciamento_Escolar.Results;
+using Sistema_Gerenciamento_Escolar.Services;
+using Sistema_Gerenciamento_Escolar.Web.DTOs;
+
 namespace Sistema_Gerenciamento_Escolar.Web.Services;
 
 public class GerenciadorEscolarService
