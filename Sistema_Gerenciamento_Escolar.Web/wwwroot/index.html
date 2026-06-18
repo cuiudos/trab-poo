@@ -56,7 +56,7 @@
           <summary>Contas de demonstração</summary>
           <ul>
             <li><strong>Diretor:</strong> diretor1 / diretor123</li>
-            <li><strong>Professor:</strong> profesor2 / profesor23</li>
+            <li><strong>Professor:</strong> professor2 / profesor23</li>
             <li><strong>Aluno:</strong> alunos123 / alunos123</li>
           </ul>
         </details>
@@ -79,6 +79,15 @@
     <main class="app-main">
       <section id="painel-diretor" class="painel" hidden>
         <h2>Painel do Diretor</h2>
+        <section class="card card-wide card-destaque">
+          <div class="card-head">
+            <h3>Painel de usuários — Jardim das Acácias</h3>
+            <button type="button" class="btn-ghost btn-sm" data-acao="refresh-usuarios">Atualizar</button>
+          </div>
+          <div id="dir-lista-usuarios" class="lista-usuarios">
+            <p class="meta">Carregando usuários…</p>
+          </div>
+        </section>
         <div class="grid-cards">
           <article class="card">
             <h3>Nova turma</h3>
@@ -90,7 +99,7 @@
             <input type="text" id="dir-al-nome" placeholder="Nome completo" />
             <input type="text" id="dir-al-cpf" placeholder="CPF" />
             <input type="text" id="dir-al-turma" placeholder="Turma (ex: 3º Ano A)" />
-            <input type="email" id="dir-al-email" placeholder="E-mail do aluno" />
+            <input type="text" id="dir-al-email" placeholder="Login ou e-mail do aluno" />
             <input type="password" id="dir-al-pass" placeholder="Senha (mín. 8)" minlength="8" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-aluno">Cadastrar</button>
           </article>
@@ -99,13 +108,13 @@
             <input type="text" id="dir-pr-nome" placeholder="Nome completo" />
             <input type="text" id="dir-pr-cpf" placeholder="CPF" />
             <input type="text" id="dir-pr-disc" placeholder="Disciplina" />
-            <input type="email" id="dir-pr-email" placeholder="E-mail do professor" />
+            <input type="text" id="dir-pr-email" placeholder="Login ou e-mail do professor" />
             <input type="password" id="dir-pr-pass" placeholder="Senha (mín. 8)" minlength="8" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-prof">Cadastrar</button>
           </article>
           <article class="card">
             <h3>Vincular professor à turma</h3>
-            <input type="text" id="dir-vinc-prof" placeholder="E-mail do professor" />
+            <input type="text" id="dir-vinc-prof" placeholder="Login ou e-mail do professor" />
             <input type="text" id="dir-vinc-turma" placeholder="Nome da turma" />
             <button type="button" class="btn-primary btn-sm" data-acao="vincular">Vincular</button>
           </article>
@@ -161,6 +170,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=3"></script>
 </body>
 </html>

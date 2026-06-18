@@ -31,6 +31,24 @@ static bool Autorizado(HttpContext ctx, params TipoAcesso[] perfis)
 }
 
 static IResult NaoAutorizado() => Results.Json(new { ok = false, mensagem = "Acesso negado." }, statusCode: 401);
+
+app.MapGet("/api/env", () =>
+{
+    var url = Environment.GetEnvironmentVariable("SUPABASE_URL")?.Trim();
+    var anonKey = Environment.GetEnvironmentVariable("SUPABASE_ANON_KEY")?.Trim();
+
+    if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(anonKey))
+    {
+        return Results.Json(new
+        {
+            ok = false,
+            mensagem = "Configure SUPABASE_URL e SUPABASE_ANON_KEY nas variáveis de ambiente do sistema."
+        }, statusCode: 500);
+    }
+
+    return Results.Json(new { ok = true, url, anonKey });
+});
+
 app.MapPost("/api/auth/login", (HttpContext ctx, LoginRequest req) =>
 {
     if (!Enum.TryParse<TipoAcesso>(req.Tipo, true, out var tipo))

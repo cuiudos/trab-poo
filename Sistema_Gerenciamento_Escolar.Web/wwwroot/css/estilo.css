@@ -426,6 +426,55 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.card-destaque {
+  border: 2px solid var(--verde);
+  margin-bottom: 1.25rem;
+}
+
+.card-destaque .card-head h3 {
+  color: var(--verde);
+}
+
+.lista-usuarios {
+  overflow-x: auto;
+}
+
+.login-cell {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  font-size: 0.82rem;
+  background: #f0ebe6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.tabela-usuarios code {
+  color: var(--texto);
+}
+
+.badge-role {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.badge-role-diretor {
+  background: #e8f0e8;
+  color: var(--verde);
+}
+
+.badge-role-professor {
+  background: #e8eef8;
+  color: #2a4a8a;
+}
+
+.badge-role-aluno {
+  background: #f5efe8;
+  color: #6a4a2a;
+}
+
 .tabela-alunos {
   width: 100%;
   border-collapse: collapse;

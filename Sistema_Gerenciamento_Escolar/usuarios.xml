@@ -1,23 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
-<SistemaGerenciamentoEscolar>
-  <Diretor>
-    <Usuario login="diretor1" senha="diretor123">
-      <Nome>Álvaro Gonçalves de Carvalho</Nome>
-      <Cpf>11111111111</Cpf>
-    </Usuario>
-  </Diretor>
-  <Professores>
-    <Professor login="profesor2" senha="profesor23">
-      <Nome>Danton Rodrigues Diniz</Nome>
-      <Cpf>22222222222</Cpf>
-      <Disciplina>Matemática</Disciplina>
-    </Professor>
-  </Professores>
-  <Alunos>
-    <Aluno login="alunos123" senha="alunos123">
-      <Nome>Pedro Henrique Alves Emerick</Nome>
-      <Cpf>66666666666</Cpf>
-      <Turma>3º Ano A</Turma>
-    </Aluno>
-  </Alunos>
-</SistemaGerenciamentoEscolar>
+<?xml version="1.0" encoding="utf-8"?>
+<SistemaGerenciamentoEscolar>
+  <Diretor>
+    <Usuario login="diretor1" senha="diretor123">
+      <Nome>Álvaro Gonçalves de Carvalho</Nome>
+      <Cpf>11111111111</Cpf>
+    </Usuario>
+  </Diretor>
+  <Professores>
+    <Professor login="professor2" senha="profesor23">
+      <Nome>Danton Rodrigues Diniz</Nome>
+      <Cpf>22222222222</Cpf>
+      <Disciplina>Matemática</Disciplina>
+    </Professor>
+  </Professores>
+  <Alunos>
+    <Aluno login="alunos123" senha="alunos123">
+      <Nome>Pedro Henrique Alves Emerick</Nome>
+      <Cpf>66666666666</Cpf>
+      <Turma>3º Ano A</Turma>
+    </Aluno>
+  </Alunos>
+</SistemaGerenciamentoEscolar>

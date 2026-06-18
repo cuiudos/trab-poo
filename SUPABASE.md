@@ -45,7 +45,7 @@ Isso cria:
 | Perfil | Usuário | Senha |
 |--------|---------|-------|
 | Diretor | `diretor1` | `diretor123` |
-| Professor | `profesor2` | `profesor23` |
+| Professor | `professor2` | `profesor23` |
 | Aluno | `alunos123` | `alunos123` |
 
 No portal web, digite só o **usuário** (ex: `diretor1`) — o sistema completa `@acacias.edu.br` automaticamente.

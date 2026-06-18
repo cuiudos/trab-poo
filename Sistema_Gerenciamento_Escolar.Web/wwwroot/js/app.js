@@ -51,6 +51,16 @@ async function initSupabase() {
   });
 }
 
+async function adminGet(path) {
+  const res = await fetch(path, { headers: authHeader() });
+  const text = await res.text();
+  try {
+    return { status: res.status, ...JSON.parse(text) };
+  } catch {
+    return { ok: false, status: res.status, mensagem: "Servidor indisponível." };
+  }
+}
+
 async function buscarIdPorEmail(email) {
   const e = loginParaEmail(email);
   const r = await adminPost("/api/admin/buscar-email", { email: e });
@@ -59,18 +69,52 @@ async function buscarIdPorEmail(email) {
 }
 
 /* —— Login —— */
-document.querySelectorAll(".role-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".role-tab").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    perfilAtual = btn.dataset.tipo;
+const DOMINIO_LOGIN = "acacias.edu.br";
+
+function ativarAbaPerfil(role) {
+  document.querySelectorAll(".role-tab").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tipo === role);
   });
-});
+  perfilAtual = role;
+}
+
+function emailsParaTentar(valor) {
+  const v = valor.trim().toLowerCase();
+  const base = v.includes("@") ? v.split("@")[0] : v;
+  const emails = new Set([v.includes("@") ? v : `${base}@${DOMINIO_LOGIN}`]);
+
+  if (base === "professor2") emails.add(`profesor2@${DOMINIO_LOGIN}`);
+  if (base === "profesor2") emails.add(`professor2@${DOMINIO_LOGIN}`);
+
+  return [...emails];
+}
 
 function loginParaEmail(valor) {
-  const v = valor.trim().toLowerCase();
-  return v.includes("@") ? v : `${v}@acacias.edu.br`;
+  return emailsParaTentar(valor)[0];
 }
+
+function emailParaLogin(email) {
+  if (!email) return "";
+  const partes = email.toLowerCase().split("@");
+  if (partes.length !== 2) return email;
+  const [local, dominio] = partes;
+  return dominio === DOMINIO_LOGIN ? local : email;
+}
+
+async function signInComEmail(valor, password) {
+  let ultimoErro = null;
+  for (const email of emailsParaTentar(valor)) {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (!error) return { data, error: null };
+    ultimoErro = error;
+    if (error.message !== "Invalid login credentials") break;
+  }
+  return { data: null, error: ultimoErro };
+}
+
+document.querySelectorAll(".role-tab").forEach((btn) => {
+  btn.addEventListener("click", () => ativarAbaPerfil(btn.dataset.tipo));
+});
 
 $("#form-login").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -82,15 +126,12 @@ $("#form-login").addEventListener("submit", async (e) => {
 
   try {
     await ensureSupabase();
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email: loginParaEmail($("#email").value),
-      password: $("#senha").value,
-    });
+    const { data, error } = await signInComEmail($("#email").value, $("#senha").value);
 
     if (error) {
       erro.textContent =
         error.message === "Invalid login credentials"
-          ? "E-mail ou senha incorretos."
+          ? "Usuário ou senha incorretos. Use só o login (ex: professor2) ou o e-mail completo."
           : error.message;
       erro.hidden = false;
       return;
@@ -107,18 +148,12 @@ $("#form-login").addEventListener("submit", async (e) => {
 
     if (perfilErr || !perfil) {
       await supabaseClient.auth.signOut();
-      erro.textContent = "Perfil não cadastrado. Execute: node scripts/setup-supabase.mjs";
+      erro.textContent = "Perfil não cadastrado. Execute: npm run setup";
       erro.hidden = false;
       return;
     }
 
-    if (perfil.role !== perfilAtual) {
-      await supabaseClient.auth.signOut();
-      erro.textContent = `Selecione a aba "${perfil.role}" para este e-mail.`;
-      erro.hidden = false;
-      return;
-    }
-
+    ativarAbaPerfil(perfil.role);
     escolaId = perfil.escola_id;
     mostrarApp({ nome: perfil.nome, perfil: perfil.role });
   } catch (err) {
@@ -147,6 +182,7 @@ function mostrarApp(sessao) {
 
   if (sessao.perfil === "diretor") {
     $("#painel-diretor").hidden = false;
+    carregarUsuariosDiretor();
     carregarTurmasDiretor();
   } else if (sessao.perfil === "professor") {
     $("#painel-professor").hidden = false;
@@ -173,12 +209,27 @@ async function verificarSessao() {
 
   if (perfil) {
     escolaId = perfil.escola_id;
-    perfilAtual = perfil.role;
+    ativarAbaPerfil(perfil.role);
     mostrarApp({ nome: perfil.nome, perfil: perfil.role });
   }
 }
 
+let cacheUsuariosPorId = null;
+
+async function obterUsuariosPorId() {
+  if (!cacheUsuariosPorId) {
+    const lista = await listarTodosUsuarios();
+    cacheUsuariosPorId = new Map(lista.map((u) => [u.id, u]));
+  }
+  return cacheUsuariosPorId;
+}
+
+function invalidarCacheUsuarios() {
+  cacheUsuariosPorId = null;
+}
+
 async function listarTurmasCompletas() {
+  const usuarios = perfilAtual === "diretor" ? await obterUsuariosPorId() : new Map();
   const { data: turmas, error: turmaErr } = await supabaseClient
     .from("turmas")
     .select("id, nome, professor_id")
@@ -222,7 +273,14 @@ async function listarTurmasCompletas() {
       });
     }
 
-    resultado.push({ id: t.id, nome: t.nome, professorNome, alunos });
+    resultado.push({
+      id: t.id,
+      nome: t.nome,
+      professorId: t.professor_id,
+      professorNome,
+      professorLogin: t.professor_id ? usuarios.get(t.professor_id)?.login : null,
+      alunos,
+    });
   }
 
   return resultado;
@@ -243,21 +301,96 @@ function renderTurmas(container, turmas, comSelect = false) {
         )
         .join("");
 
+      const profInfo = t.professorNome
+        ? t.professorLogin
+          ? `${escapeHtml(t.professorNome)} (login: <code class="login-cell">${escapeHtml(t.professorLogin)}</code>)`
+          : escapeHtml(t.professorNome)
+        : "Não vinculado";
+
       return `
       <div class="turma-bloco" data-turma-id="${t.id}">
         <h4>${escapeHtml(t.nome)}</h4>
-        <p class="meta">Professor: ${escapeHtml(t.professorNome || "Não vinculado")}</p>
+        <p class="meta">Professor: ${profInfo}</p>
         ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Nota</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
     .join("");
 
-  if (comSelect && turmas[0]?.alunos?.length) {
-    const opts = turmas[0].alunos
-      .map((a) => `<option value="${a.registroId}">${escapeHtml(a.nome)}</option>`)
-      .join("");
-    $("#pr-nota-aluno").innerHTML = opts;
-    $("#pr-falta-aluno").innerHTML = opts;
+  if (comSelect) {
+    const alunos = turmas.flatMap((t) => t.alunos || []);
+    if (alunos.length) {
+      const opts = alunos
+        .map((a) => `<option value="${a.registroId}">${escapeHtml(a.nome)}</option>`)
+        .join("");
+      $("#pr-nota-aluno").innerHTML = opts;
+      $("#pr-falta-aluno").innerHTML = opts;
+    }
+  }
+}
+
+function labelPerfil(role) {
+  return { diretor: "Diretor", professor: "Professor", aluno: "Aluno" }[role] || role;
+}
+
+async function listarTodosUsuarios() {
+  const r = await adminGet("/api/admin/listar-usuarios");
+  if (r.ok && r.usuarios) return r.usuarios;
+  if (r.status === 401 || r.status === 403) throw new Error(r.mensagem || "Acesso negado.");
+
+  const { data, error } = await supabaseClient
+    .from("perfis")
+    .select("id, nome, cpf, role, disciplina")
+    .eq("escola_id", escolaId)
+    .order("role")
+    .order("nome");
+
+  if (error) throw error;
+
+  return (data || []).map((u) => ({
+    id: u.id,
+    nome: u.nome,
+    login: null,
+    cpf: u.cpf,
+    role: u.role,
+    disciplina: u.disciplina,
+  }));
+}
+
+function renderUsuarios(container, usuarios) {
+  if (!usuarios?.length) {
+    container.innerHTML = "<p>Nenhum usuário cadastrado.</p>";
+    return;
+  }
+
+  const rows = usuarios
+    .map(
+      (u) => `
+      <tr>
+        <td><code class="login-cell">${escapeHtml(u.login || "—")}</code></td>
+        <td>${escapeHtml(u.nome)}</td>
+        <td><span class="badge-role badge-role-${escapeHtml(u.role)}">${escapeHtml(labelPerfil(u.role))}</span></td>
+      </tr>`
+    )
+    .join("");
+
+  container.innerHTML = `
+    <table class="tabela-alunos tabela-usuarios">
+      <thead>
+        <tr><th>Login</th><th>Nome</th><th>Perfil</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+async function carregarUsuariosDiretor() {
+  const container = $("#dir-lista-usuarios");
+  if (!container) return;
+  container.innerHTML = "<p class='meta'>Carregando usuários…</p>";
+  try {
+    renderUsuarios(container, await listarTodosUsuarios());
+  } catch (e) {
+    container.innerHTML = `<p class="alert">${escapeHtml(e.message)}</p>`;
+    toast(e.message);
   }
 }
 
@@ -290,6 +423,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
         turmaNome: $("#dir-al-turma").value,
       });
       if (!r.ok) throw new Error(r.mensagem);
+      invalidarCacheUsuarios();
       toast(r.mensagem);
     } else if (acao === "cad-prof") {
       const r = await adminPost("/api/admin/criar-usuario", {
@@ -301,6 +435,7 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
         disciplina: $("#dir-pr-disc").value,
       });
       if (!r.ok) throw new Error(r.mensagem);
+      invalidarCacheUsuarios();
       toast(r.mensagem);
     } else if (acao === "vincular") {
       const profId = await buscarIdPorEmail($("#dir-vinc-prof").value);
@@ -317,7 +452,10 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
 
       const { error } = await supabaseClient.from("turmas").update({ professor_id: profId }).eq("id", turma.id);
       if (error) throw error;
-      toast("Professor vinculado!");
+      invalidarCacheUsuarios();
+      const usuarios = await obterUsuariosPorId();
+      const prof = usuarios.get(profId);
+      toast(`Professor vinculado! Login: ${prof?.login || $("#dir-vinc-prof").value.trim()}`);
     } else if (acao === "edit-nf") {
       const alunoId = await buscarIdPorEmail($("#dir-nf-email").value);
       if (!alunoId) throw new Error("Aluno não encontrado.");
@@ -332,7 +470,11 @@ document.querySelector("#painel-diretor").addEventListener("click", async (e) =>
     } else if (acao === "refresh-turmas") {
       await carregarTurmasDiretor();
       return;
+    } else if (acao === "refresh-usuarios") {
+      await carregarUsuariosDiretor();
+      return;
     }
+    await carregarUsuariosDiretor();
     await carregarTurmasDiretor();
   } catch (err) {
     toast(err.message);
@@ -343,26 +485,31 @@ async function carregarTurmaProfessor() {
   const sem = $("#prof-sem-turma");
   const cont = $("#prof-conteudo");
 
-  const { data: turma, error } = await supabaseClient
+  const { data: turmas, error } = await supabaseClient
     .from("turmas")
     .select("id, nome")
     .eq("professor_id", userId)
-    .maybeSingle();
+    .order("nome");
 
-  if (error || !turma) {
+  if (error || !turmas?.length) {
+    const { data: authData } = await supabaseClient.auth.getUser();
+    const meuLogin = emailParaLogin(authData?.user?.email);
     sem.hidden = false;
     cont.hidden = true;
-    sem.textContent = "Você ainda não possui turma vinculada pelo diretor.";
+    sem.innerHTML = `
+      <p><strong>Nenhuma turma vinculada ao login <code class="login-cell">${escapeHtml(meuLogin)}</code>.</strong></p>
+      <p>Se o diretor já vinculou um professor com seu nome, confira no painel dele qual <strong>login</strong> foi usado e entre com essa conta.</p>`;
     return;
   }
 
   sem.hidden = true;
   cont.hidden = false;
-  $("#prof-turma-titulo").textContent = `Turma: ${turma.nome}`;
+  $("#prof-turma-titulo").textContent =
+    turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
-  const turmas = await listarTurmasCompletas();
-  const minha = turmas.filter((t) => t.id === turma.id);
-  renderTurmas($("#prof-lista-alunos"), minha, true);
+  const todas = await listarTurmasCompletas();
+  const ids = new Set(turmas.map((t) => t.id));
+  renderTurmas($("#prof-lista-alunos"), todas.filter((t) => ids.has(t.id)), true);
 }
 
 document.querySelector("#painel-professor").addEventListener("click", async (e) => {

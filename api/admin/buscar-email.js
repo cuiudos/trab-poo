@@ -1,5 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
 const { parseBody } = require("../_lib/body");
+const { emailsParaBusca } = require("../_lib/email");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -28,11 +29,13 @@ module.exports = async (req, res) => {
   if (diretor?.role !== "diretor") return res.status(403).json({ ok: false });
 
   const body = await parseBody(req);
-  const email = (body.email || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ ok: false, mensagem: "E-mail obrigatório." });
+  const candidatos = emailsParaBusca(body.email || "");
+  if (!candidatos.length) return res.status(400).json({ ok: false, mensagem: "E-mail obrigatório." });
 
   const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  const user = list?.users?.find((u) => u.email?.toLowerCase() === email);
+  const user = candidatos
+    .map((email) => list?.users?.find((u) => u.email?.toLowerCase() === email))
+    .find(Boolean);
 
   if (!user) return res.json({ ok: false, mensagem: "Usuário não encontrado." });
 

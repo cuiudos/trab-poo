@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node -e \"console.log('Build OK')\""
+    "build": "node -e \"console.log('Build OK')\"",
+    "setup": "node --use-system-ca scripts/setup-supabase.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1"

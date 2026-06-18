@@ -1,5 +1,6 @@
 const { createClient } = require("@supabase/supabase-js");
 const { parseBody } = require("../_lib/body");
+const { normalizarEmail } = require("../_lib/email");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -38,6 +39,7 @@ module.exports = async (req, res) => {
 
   const body = await parseBody(req);
   const { email, password, nome, cpf, role, disciplina, turmaNome } = body;
+  const emailNormalizado = normalizarEmail(email);
 
   if (!email || !password || !nome || !role) {
     return res.status(400).json({ ok: false, mensagem: "E-mail, senha, nome e perfil são obrigatórios." });
@@ -48,7 +50,7 @@ module.exports = async (req, res) => {
   }
 
   const { data: novoAuth, error: createErr } = await admin.auth.admin.createUser({
-    email: email.trim().toLowerCase(),
+    email: emailNormalizado,
     password,
     email_confirm: true,
   });

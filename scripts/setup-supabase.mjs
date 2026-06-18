@@ -1,6 +1,6 @@
 /**
  * Cria usuários de teste no Supabase Auth + perfis.
- * Logins: diretor1, profesor2, alunos123
+ * Logins: diretor1, professor2, alunos123
  *
  * Se der "fetch failed" no Windows, use:
  *   npm run setup
@@ -71,12 +71,13 @@ const usuarios = [
     role: "diretor",
   },
   {
-    login: "profesor2",
+    login: "professor2",
     password: "profesor23",
     nome: "Danton Rodrigues Diniz",
     cpf: "22222222222",
     role: "professor",
     disciplina: "Matemática",
+    aliases: ["profesor2"],
   },
   {
     login: "alunos123",
@@ -146,6 +147,21 @@ async function obterOuCriarTurma(escolaId) {
   return criada.id;
 }
 
+async function limparProfessoresDuplicados() {
+  const { data: list, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (listErr) return;
+
+  const canonico = list?.users?.find((u) => u.email?.toLowerCase() === `professor2@${DOMINIO}`);
+  const legado = list?.users?.find((u) => u.email?.toLowerCase() === `profesor2@${DOMINIO}`);
+
+  if (!canonico || !legado || canonico.id === legado.id) return;
+
+  await admin.from("turmas").update({ professor_id: canonico.id }).eq("professor_id", legado.id);
+  await admin.from("perfis").delete().eq("id", legado.id);
+  await admin.auth.admin.deleteUser(legado.id);
+  console.log("Conta duplicada removida: profesor2 (use professor2)");
+}
+
 async function main() {
   console.log("Conectando ao Supabase:", url);
 
@@ -159,33 +175,31 @@ async function main() {
 
   for (const u of usuarios) {
     const email = `${u.login}@${DOMINIO}`;
+    const emailsBusca = [email, ...(u.aliases || []).map((a) => `${a}@${DOMINIO}`)];
 
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password: u.password,
-      email_confirm: true,
-    });
+    const { data: list, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (listErr) throw listErr;
 
-    let userId = created?.user?.id;
+    const existente = emailsBusca
+      .map((e) => list?.users?.find((x) => x.email?.toLowerCase() === e))
+      .find(Boolean);
 
-    if (createErr) {
-      const jaExiste =
-        createErr.message?.includes("already") ||
-        createErr.message?.includes("registered") ||
-        createErr.status === 422;
+    let userId;
 
-      if (jaExiste) {
-        const { data: list, error: listErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
-        if (listErr) throw listErr;
-        const found = list?.users?.find((x) => x.email?.toLowerCase() === email);
-        if (!found) throw createErr;
-        userId = found.id;
-        await admin.auth.admin.updateUserById(userId, { password: u.password });
-        console.log(`Atualizado: ${u.login}`);
-      } else {
-        throw createErr;
-      }
+    if (existente) {
+      userId = existente.id;
+      const updates = { password: u.password };
+      if (existente.email?.toLowerCase() !== email) updates.email = email;
+      await admin.auth.admin.updateUserById(userId, updates);
+      console.log(existente.email?.toLowerCase() !== email ? `Migrado: ${existente.email} → ${u.login}` : `Atualizado: ${u.login}`);
     } else {
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        password: u.password,
+        email_confirm: true,
+      });
+      if (createErr) throw createErr;
+      userId = created.user.id;
       console.log(`Criado: ${u.login}`);
     }
 
@@ -205,19 +219,24 @@ async function main() {
     }
 
     if (u.role === "aluno") {
-      const { error: regErr } = await admin.from("registros_alunos").upsert({
-        perfil_id: userId,
-        turma_id: turmaId,
-        nota: u.nota ?? 0,
-        faltas: u.faltas ?? 0,
-      });
+      const { error: regErr } = await admin.from("registros_alunos").upsert(
+        {
+          perfil_id: userId,
+          turma_id: turmaId,
+          nota: u.nota ?? 0,
+          faltas: u.faltas ?? 0,
+        },
+        { onConflict: "perfil_id" }
+      );
       if (regErr) falhar(`Erro ao registrar aluno ${u.login}`, regErr);
     }
   }
 
+  await limparProfessoresDuplicados();
+
   console.log("\n✓ Setup concluído — Colégio Jardim das Acácias");
   console.log("  Diretor   → diretor1   / diretor123");
-  console.log("  Professor → profesor2  / profesor23");
+  console.log("  Professor → professor2 / profesor23");
   console.log("  Aluno     → alunos123  / alunos123");
 }
 

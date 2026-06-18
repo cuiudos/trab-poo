@@ -20,7 +20,7 @@ Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno).
 | Perfil | Usuário | Senha |
 |--------|---------|-------|
 | Diretor | `diretor1` | `diretor123` |
-| Professor | `profesor2` | `profesor23` |
+| Professor | `professor2` | `profesor23` |
 | Aluno | `alunos123` | `alunos123` |
 
 ## Rodar no PC (console)
