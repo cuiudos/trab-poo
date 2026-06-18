@@ -280,9 +280,10 @@ function calcularFrequenciaDisciplina(faltas, totalAulas) {
   const f = Number(faltas) || 0;
   if (total <= 0) return null;
   const limiteFaltas = Math.floor(total * 0.25);
-  const frequencia = Math.round(((total - f) / total) * 1000) / 10;
+  const percentualFaltas = Math.round((f / total) * 1000) / 10;
+  const percentualPresenca = Math.round(((total - f) / total) * 1000) / 10;
   const reprovadoFalta = f > limiteFaltas;
-  return { faltas: f, totalAulas: total, frequencia, limiteFaltas, reprovadoFalta };
+  return { faltas: f, totalAulas: total, percentualFaltas, percentualPresenca, limiteFaltas, reprovadoFalta };
 }
 
 function mapFaltasLista(faltas) {
@@ -332,7 +333,7 @@ function formatFrequenciaHtml(faltasDisciplinas, aulasDisciplinas) {
       const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, aulasDisciplinas[disc]);
       if (!calc) return "";
       const cls = calc.reprovadoFalta ? "freq-reprovado" : "freq-ok";
-      return `<div class="freq-item ${cls}"><strong>${escapeHtml(disc)}</strong>: ${calc.faltas}/${calc.totalAulas} faltas · ${calc.frequencia}%</div>`;
+      return `<div class="freq-item ${cls}"><strong>${escapeHtml(disc)}</strong>: ${calc.faltas}/${calc.totalAulas} faltas · ${calc.percentualFaltas}% faltas</div>`;
     })
     .join("");
 }
@@ -548,7 +549,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
         <p class="meta">Professor: ${profInfo}</p>
         ${discHtml}
         ${aulasInfo}
-        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas</th><th>Total</th><th>Frequência</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
+        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas</th><th>Total</th><th>% Faltas</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
     .join("");
@@ -964,7 +965,7 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 });
 
 async function carregarDadosAluno() {
-  const card = $("#aluno-card");
+  const container = $("#aluno-dashboard");
   let reg = null;
   let error = null;
 
@@ -1004,7 +1005,7 @@ async function carregarDadosAluno() {
   }
 
   if (error || !reg) {
-    card.innerHTML = `<p class="alert">Registro acadêmico não encontrado.</p>`;
+    container.innerHTML = `<p class="alert">Registro acadêmico não encontrado.</p>`;
     return;
   }
 
@@ -1021,27 +1022,119 @@ async function carregarDadosAluno() {
   const aulasDisciplinas = reg.turma_id ? await buscarAulasTurma(reg.turma_id) : {};
   const resultado = calcularSituacaoCompleta(notas, faltasDisciplinas, aulasDisciplinas);
 
-  card.innerHTML = `
-    <p><strong>Escola:</strong> Colégio Jardim das Acácias</p>
-    <p><strong>Nome:</strong> ${escapeHtml(perfil?.nome)}</p>
-    <p><strong>CPF:</strong> ${escapeHtml(perfil?.cpf || "")}</p>
-    <p><strong>Turma:</strong> ${escapeHtml(reg.turma?.nome || "")}</p>
-    <p><strong>Notas:</strong></p>
-    <div class="notas-aluno">${formatNotasHtml(notas)}</div>
-    <p><strong>Total (notas):</strong> ${
-      resultado.percentual !== null
-        ? `${resultado.percentual}% (${resultado.pontos} / ${resultado.pontosMax} pontos)`
-        : "Sem notas lançadas"
-    }</p>
-    <p><strong>Frequência por disciplina:</strong></p>
-    <div class="notas-aluno">${formatFrequenciaHtml(faltasDisciplinas, aulasDisciplinas)}</div>
-    <p><strong>Situação final:</strong> ${
-      resultado.situacaoFinal
-        ? `<span class="badge-situacao ${resultado.situacaoFinal.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado"}">${resultado.situacaoFinal}</span>`
-        : "—"
-    }</p>
-    <p class="meta">Aprovação: mínimo 60% nas notas e mínimo 75% de presença (máx. 25% faltas) em cada disciplina.</p>
-  `;
+  container.innerHTML = renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado);
+}
+
+function notasPorDisciplina(notas) {
+  const map = {};
+  for (const n of notas || []) {
+    if (!map[n.disciplina]) map[n.disciplina] = { pontos: 0, max: 0 };
+    map[n.disciplina].pontos += Number(n.nota) || 0;
+    map[n.disciplina].max += Number(n.valorAtividade ?? 100) || 0;
+  }
+  return Object.entries(map).map(([disciplina, v]) => ({
+    disciplina,
+    pontos: v.pontos,
+    max: v.max,
+    percentual: v.max > 0 ? Math.round((v.pontos / v.max) * 1000) / 10 : null,
+  }));
+}
+
+function renderBarraDash(percentual, clsExtra = "") {
+  const pct = percentual ?? 0;
+  const width = Math.min(100, Math.max(0, pct));
+  return `<div class="dash-bar ${clsExtra}"><div class="dash-fill" style="width:${width}%"></div></div>`;
+}
+
+function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado) {
+  const situacaoCls = resultado.situacaoFinal?.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
+  const notasDisc = notasPorDisciplina(notas);
+  const discsFaltas = Object.keys(aulasDisciplinas || {});
+
+  const notasDiscHtml = notasDisc.length
+    ? notasDisc
+        .map((d) => {
+          const ok = d.percentual !== null && d.percentual >= 60;
+          return `
+          <div class="dash-disc-item">
+            <div class="dash-disc-head">
+              <strong>${escapeHtml(d.disciplina)}</strong>
+              <span class="${ok ? "dash-ok" : "dash-warn"}">${d.percentual ?? "—"}%</span>
+            </div>
+            ${renderBarraDash(d.percentual, ok ? "dash-bar-ok" : "dash-bar-warn")}
+            <span class="meta">${d.pontos} / ${d.max} pontos</span>
+          </div>`;
+        })
+        .join("")
+    : `<p class="meta dash-vazio">Nenhuma nota lançada ainda.</p>`;
+
+  const faltasDiscHtml = discsFaltas.length
+    ? discsFaltas
+        .map((disc) => {
+          const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, aulasDisciplinas[disc]);
+          if (!calc) return "";
+          const ok = !calc.reprovadoFalta;
+          return `
+          <div class="dash-disc-item">
+            <div class="dash-disc-head">
+              <strong>${escapeHtml(disc)}</strong>
+              <span class="${ok ? "dash-ok" : "dash-warn"}">${calc.percentualFaltas}% faltas</span>
+            </div>
+            ${renderBarraDash(calc.percentualFaltas, ok ? "dash-bar-faltas-ok" : "dash-bar-faltas-warn")}
+            <span class="meta">${calc.faltas} de ${calc.totalAulas} aulas · máx. 25% (${calc.limiteFaltas} faltas)</span>
+          </div>`;
+        })
+        .join("")
+    : `<p class="meta dash-vazio">Aulas ainda não cadastradas pelo professor.</p>`;
+
+  const notasListaHtml = notas.length
+    ? `<div class="notas-aluno dash-notas-lista">${formatNotasHtml(notas)}</div>`
+    : `<p class="meta dash-vazio">Sem lançamentos.</p>`;
+
+  return `
+    <div class="aluno-dashboard-grid">
+      <article class="card aluno-info-card">
+        <h3>Perfil</h3>
+        <dl class="aluno-dl">
+          <div><dt>Escola</dt><dd>Colégio Jardim das Acácias</dd></div>
+          <div><dt>Nome</dt><dd>${escapeHtml(perfil?.nome)}</dd></div>
+          <div><dt>CPF</dt><dd>${escapeHtml(perfil?.cpf || "—")}</dd></div>
+          <div><dt>Turma</dt><dd>${escapeHtml(reg.turma?.nome || "—")}</dd></div>
+        </dl>
+      </article>
+
+      <article class="card dash-stat">
+        <p class="dash-label">Média geral</p>
+        <p class="dash-value">${resultado.percentual !== null ? `${resultado.percentual}%` : "—"}</p>
+        ${resultado.percentual !== null ? renderBarraDash(resultado.percentual, resultado.percentual >= 60 ? "dash-bar-ok" : "dash-bar-warn") : ""}
+        <p class="meta dash-meta">${resultado.percentual !== null ? `${resultado.pontos} / ${resultado.pontosMax} pontos` : "Sem notas"}</p>
+      </article>
+
+      <article class="card dash-stat">
+        <p class="dash-label">Situação final</p>
+        <p class="dash-situacao">${
+          resultado.situacaoFinal
+            ? `<span class="badge-situacao ${situacaoCls}">${resultado.situacaoFinal}</span>`
+            : "—"
+        }</p>
+        <p class="meta dash-meta">Mín. 60% nas notas e máx. 25% de faltas por disciplina.</p>
+      </article>
+
+      <article class="card dash-panel-wide">
+        <h3>Desempenho por disciplina</h3>
+        <div class="dash-disc-grid">${notasDiscHtml}</div>
+      </article>
+
+      <article class="card dash-panel-wide">
+        <h3>Faltas por disciplina</h3>
+        <div class="dash-disc-grid">${faltasDiscHtml}</div>
+      </article>
+
+      <article class="card dash-panel-wide">
+        <h3>Detalhamento das notas</h3>
+        ${notasListaHtml}
+      </article>
+    </div>`;
 }
 
 initSupabase()

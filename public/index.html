@@ -143,7 +143,7 @@
             </article>
             <article class="card">
               <h3>Aulas dadas na disciplina</h3>
-              <p class="meta card-hint">Máx. 25% de faltas por lei (mín. 75% de presença).</p>
+              <p class="meta card-hint">Máx. 25% de faltas por disciplina (por lei).</p>
               <div id="pr-aulas-turma-wrap">
                 <select id="pr-aulas-turma" class="select-full"></select>
               </div>
@@ -168,10 +168,10 @@
         </div>
       </section>
 
-      <section id="painel-aluno" class="painel" hidden>
+      <section id="painel-aluno" class="painel painel-aluno" hidden>
         <h2>Minhas informações</h2>
-        <p class="login-sub">Colégio Jardim das Acácias — consulta somente leitura</p>
-        <div id="aluno-card" class="card aluno-resumo"></div>
+        <p class="login-sub aluno-subtitulo">Colégio Jardim das Acácias — consulta somente leitura</p>
+        <div id="aluno-dashboard" class="aluno-dashboard"></div>
       </section>
     </main>
 
@@ -214,6 +214,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=14"></script>
+  <script src="/js/app.js?v=15"></script>
 </body>
 </html>

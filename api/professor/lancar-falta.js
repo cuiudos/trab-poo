@@ -87,12 +87,11 @@ module.exports = async (req, res) => {
   if (novasFaltas === 0 && atual?.id) {
     const { error: delErr } = await admin.from("faltas_disciplinas").delete().eq("id", atual.id);
     if (delErr) return res.status(400).json({ ok: false, mensagem: delErr.message });
-    const freq = 100;
     return res.json({
       ok: true,
-      mensagem: `Falta removida em ${disc.discCanon}. Aluno sem faltas nesta disciplina (${freq}% presença).`,
+      mensagem: `Falta removida em ${disc.discCanon}. Aluno sem faltas nesta disciplina (0% faltas).`,
       faltas: 0,
-      frequencia: freq,
+      percentualFaltas: 0,
     });
   }
 
@@ -112,13 +111,13 @@ module.exports = async (req, res) => {
     return res.status(400).json({ ok: false, mensagem: saveErr.message });
   }
 
-  const freq = Math.round(((aulasCfg.total_aulas - novasFaltas) / aulasCfg.total_aulas) * 1000) / 10;
+  const pctFaltas = Math.round((novasFaltas / aulasCfg.total_aulas) * 1000) / 10;
   let msg = remover
-    ? `Falta removida em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${freq}% presença).`
-    : `Falta registrada em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${freq}% presença).`;
+    ? `Falta removida em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${pctFaltas}% faltas).`
+    : `Falta registrada em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${pctFaltas}% faltas).`;
   if (!remover && novasFaltas > limiteFaltas) {
     msg += " Atenção: ultrapassou 25% de faltas — reprovação por frequência.";
   }
 
-  res.json({ ok: true, mensagem: msg, faltas: novasFaltas, frequencia: freq });
+  res.json({ ok: true, mensagem: msg, faltas: novasFaltas, percentualFaltas: pctFaltas });
 };

@@ -680,6 +680,175 @@ body {
   color: var(--verde);
 }
 
+.painel-aluno h2 {
+  margin-bottom: 0.75rem;
+}
+
+.aluno-subtitulo {
+  margin-bottom: 2rem;
+}
+
+.aluno-dashboard {
+  max-width: 960px;
+}
+
+.aluno-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.75rem 2rem;
+}
+
+.aluno-info-card {
+  grid-column: 1 / -1;
+}
+
+.aluno-dl {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.25rem 0 0;
+}
+
+.aluno-dl div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.aluno-dl dt {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a6f66;
+  font-weight: 600;
+}
+
+.aluno-dl dd {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--texto);
+}
+
+.dash-stat {
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dash-panel-wide {
+  grid-column: 1 / -1;
+  padding: 1.75rem 2rem;
+}
+
+.dash-panel-wide h3 {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.dash-label {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a6f66;
+  font-weight: 600;
+}
+
+.dash-value {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--verde);
+  line-height: 1.1;
+}
+
+.dash-situacao {
+  margin: 0.5rem 0;
+}
+
+.dash-meta {
+  margin: 0.25rem 0 0;
+}
+
+.dash-bar {
+  height: 10px;
+  background: #ebe4dc;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dash-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--verde);
+  transition: width 0.4s ease;
+}
+
+.dash-bar-ok .dash-fill {
+  background: #2d8a4e;
+}
+
+.dash-bar-warn .dash-fill {
+  background: #c45c3e;
+}
+
+.dash-bar-faltas-ok .dash-fill {
+  background: #4a8f5f;
+}
+
+.dash-bar-faltas-warn .dash-fill {
+  background: #b83232;
+}
+
+.dash-disc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem 2rem;
+}
+
+.dash-disc-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #f0ebe6;
+}
+
+.dash-disc-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.dash-disc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.dash-ok {
+  color: #1e6b3a;
+  font-weight: 600;
+}
+
+.dash-warn {
+  color: #a12828;
+  font-weight: 600;
+}
+
+.dash-vazio {
+  margin: 0.5rem 0 0;
+}
+
+.dash-notas-lista {
+  margin-top: 0.5rem;
+}
+
+.dash-notas-lista .nota-item {
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+
 .toast {
   position: fixed;
   bottom: 1.5rem;
