@@ -387,6 +387,12 @@ body {
   max-width: 18rem;
 }
 
+.acoes-faltas-dir {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .btn-primary:disabled {
   opacity: 0.65;
   cursor: wait;

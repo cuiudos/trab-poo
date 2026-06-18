@@ -809,17 +809,25 @@ async function executarAcaoDiretor(acao, e) {
     const usuarios = await obterUsuariosPorId();
     const prof = usuarios.get(profId);
     toast(`Professor vinculado! Login: ${prof?.login || $("#dir-vinc-prof").value.trim()}`);
-  } else if (acao === "edit-nf") {
-    const alunoId = await buscarIdPorEmail($("#dir-nf-email").value);
-    if (!alunoId) throw new Error("Aluno não encontrado.");
+  } else if (acao === "edit-nf" || acao === "remover-falta-dir") {
+    const email = $("#dir-nf-email").value.trim();
+    const disciplina = $("#dir-nf-disciplina").value.trim();
+    if (!email) throw new Error("Informe o e-mail ou login do aluno.");
+    if (!disciplina) throw new Error("Informe a disciplina.");
 
-    const upd = {};
-    if ($("#dir-nf-faltas").value !== "") upd.faltas = parseInt($("#dir-nf-faltas").value, 10);
-    if (!Object.keys(upd).length) throw new Error("Informe as faltas.");
+    const payload = { email, disciplina };
+    if (acao === "remover-falta-dir") {
+      payload.remover = true;
+    } else {
+      const val = $("#dir-nf-faltas").value;
+      if (val === "") throw new Error("Informe o total de faltas ou clique em Remover 1 falta.");
+      payload.faltas = parseInt(val, 10);
+      if (Number.isNaN(payload.faltas) || payload.faltas < 0) throw new Error("Faltas deve ser ≥ 0.");
+    }
 
-    const { error } = await supabaseClient.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
-    if (error) throw error;
-    toast("Dados atualizados!");
+    const r = await adminPost("/api/admin/editar-faltas", payload);
+    if (!r.ok) throw new Error(r.mensagem || "Não foi possível atualizar as faltas.");
+    toast(r.mensagem || "Faltas atualizadas!");
   } else if (acao === "refresh-turmas") {
     await carregarTurmasDiretor();
     return;

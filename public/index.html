@@ -120,9 +120,13 @@
           </article>
           <article class="card">
             <h3>Editar faltas</h3>
-            <input type="email" id="dir-nf-email" placeholder="E-mail do aluno" />
-            <input type="number" id="dir-nf-faltas" placeholder="Faltas" min="0" />
-            <button type="button" class="btn-primary btn-sm" data-acao="edit-nf">Salvar</button>
+            <input type="text" id="dir-nf-email" class="select-full" placeholder="E-mail ou login do aluno" />
+            <input type="text" id="dir-nf-disciplina" class="select-full" placeholder="Disciplina (ex: Matemática)" />
+            <input type="number" id="dir-nf-faltas" class="select-full" placeholder="Total de faltas" min="0" />
+            <div class="acoes-faltas-dir">
+              <button type="button" class="btn-primary btn-sm" data-acao="edit-nf">Salvar total</button>
+              <button type="button" class="btn-ghost btn-sm" data-acao="remover-falta-dir">Remover 1 falta</button>
+            </div>
           </article>
         </div>
         <section class="card card-wide">
@@ -218,6 +222,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=12"></script>
+  <script src="/js/app.js?v=13"></script>
 </body>
 </html>
