@@ -15,7 +15,7 @@ Projeto POO — turmas, login por perfil (Diretor, Professor, Aluno).
 | `public/` + `api/` | Versão para **Vercel** (navegador + API Node.js) |
 | `data/` | `usuarios.xml` e dados iniciais da escola |
 
-## Login web (Supabase)
+## Login web (Vercel)
 
 | Perfil | Usuário | Senha |
 |--------|---------|-------|
