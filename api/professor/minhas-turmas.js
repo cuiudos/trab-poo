@@ -1,4 +1,15 @@
 const { createClient } = require("@supabase/supabase-js");
+const { listaDisciplinas } = require("../_lib/disciplinas");
+
+function mapNotas(notas) {
+  return (notas || []).map((n) => ({
+    id: n.id,
+    disciplina: n.disciplina,
+    nota: n.nota,
+    descricao: n.descricao,
+    createdAt: n.created_at,
+  }));
+}
 
 module.exports = async (req, res) => {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ ok: false });
@@ -35,6 +46,8 @@ module.exports = async (req, res) => {
     return res.status(403).json({ ok: false, mensagem: "Acesso apenas para professores." });
   }
 
+  const disciplinas = listaDisciplinas(perfil.disciplina);
+
   const { data: turmas, error: turmaErr } = await admin
     .from("turmas")
     .select("id, nome")
@@ -49,10 +62,22 @@ module.exports = async (req, res) => {
   for (const t of turmas || []) {
     const { data: registros, error: regErr } = await admin
       .from("registros_alunos")
-      .select("id, nota, faltas, perfil_id, perfil:perfis(nome, cpf)")
+      .select(`
+        id, faltas, perfil_id,
+        perfil:perfis(nome, cpf),
+        notas_disciplinas(id, disciplina, nota, descricao, created_at)
+      `)
       .eq("turma_id", t.id);
 
-    if (regErr) return res.status(400).json({ ok: false, mensagem: regErr.message });
+    if (regErr) {
+      if (regErr.message?.includes("notas_disciplinas")) {
+        return res.status(400).json({
+          ok: false,
+          mensagem: "Execute supabase/migracao-notas-disciplinas.sql no Supabase.",
+        });
+      }
+      return res.status(400).json({ ok: false, mensagem: regErr.message });
+    }
 
     const alunos = (registros || []).map((r) => {
       const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
@@ -61,8 +86,8 @@ module.exports = async (req, res) => {
         perfilId: r.perfil_id,
         nome: p?.nome || "Aluno",
         cpf: p?.cpf || "",
-        nota: r.nota,
         faltas: r.faltas,
+        notasDisciplinas: mapNotas(r.notas_disciplinas),
       };
     });
 
@@ -75,5 +100,5 @@ module.exports = async (req, res) => {
     });
   }
 
-  res.json({ ok: true, turmas: resultado });
+  res.json({ ok: true, disciplinas, turmas: resultado });
 };

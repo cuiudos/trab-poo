@@ -324,6 +324,21 @@ body {
   font-family: inherit;
 }
 
+.nota-item {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  padding: 0.15rem 0;
+}
+
+.col-notas {
+  min-width: 10rem;
+  max-width: 22rem;
+}
+
+.notas-aluno .nota-item {
+  margin-bottom: 0.25rem;
+}
+
 .btn-primary:disabled {
   opacity: 0.65;
   cursor: wait;

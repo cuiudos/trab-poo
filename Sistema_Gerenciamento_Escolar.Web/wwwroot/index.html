@@ -119,9 +119,8 @@
             <button type="button" class="btn-primary btn-sm" data-acao="vincular">Vincular</button>
           </article>
           <article class="card">
-            <h3>Editar notas / faltas</h3>
+            <h3>Editar faltas</h3>
             <input type="email" id="dir-nf-email" placeholder="E-mail do aluno" />
-            <input type="number" id="dir-nf-nota" placeholder="Nota" step="0.1" min="0" max="10" />
             <input type="number" id="dir-nf-faltas" placeholder="Faltas" min="0" />
             <button type="button" class="btn-primary btn-sm" data-acao="edit-nf">Salvar</button>
           </article>
@@ -143,7 +142,9 @@
             <article class="card">
               <h3>Lançar nota</h3>
               <select id="pr-nota-aluno" class="select-full"></select>
-              <input type="number" id="pr-nota-valor" placeholder="Nota" step="0.1" min="0" max="10" />
+              <select id="pr-nota-disciplina" class="select-full"></select>
+              <input type="number" id="pr-nota-valor" placeholder="Nota (0 a 100)" step="0.1" min="0" max="100" />
+              <input type="text" id="pr-nota-desc" class="select-full" placeholder="Descrição (ex: Prova 1, Trabalho)" maxlength="120" />
               <button type="button" class="btn-primary btn-sm" data-acao="lancar-nota">Lançar</button>
             </article>
             <article class="card">
@@ -205,6 +206,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=7"></script>
+  <script src="/js/app.js?v=8"></script>
 </body>
 </html>

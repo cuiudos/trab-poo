@@ -236,6 +236,28 @@ function renderDisciplinasHtml(valor) {
   return lista.map((d) => `<span class="disciplina-tag">${escapeHtml(d)}</span>`).join("");
 }
 
+function formatNotasHtml(notas) {
+  if (!notas?.length) return "—";
+  return notas
+    .map((n) => {
+      const desc = n.descricao ? ` — ${escapeHtml(n.descricao)}` : "";
+      return `<div class="nota-item"><strong>${escapeHtml(n.disciplina)}</strong>: ${n.nota}${desc}</div>`;
+    })
+    .join("");
+}
+
+function popularSelectDisciplinas(disciplinas) {
+  const sel = $("#pr-nota-disciplina");
+  if (!sel) return;
+  if (!disciplinas?.length) {
+    sel.innerHTML = "<option value=''>Cadastre disciplinas no diretor</option>";
+    return;
+  }
+  sel.innerHTML = disciplinas
+    .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`)
+    .join("");
+}
+
 function infoExtraUsuario(u) {
   if (u.role === "professor") {
     const disc = u.disciplinas?.length ? u.disciplinas : listaDisciplinas(u.disciplina);
@@ -290,18 +312,25 @@ async function listarTurmasCompletas() {
 
     const { data: registros } = await supabaseClient
       .from("registros_alunos")
-      .select("id, nota, faltas, perfil_id, perfil:perfis(nome, cpf)")
+      .select(
+        "id, faltas, perfil_id, perfil:perfis(nome, cpf), notas_disciplinas(disciplina, nota, descricao, created_at)"
+      )
       .eq("turma_id", t.id);
 
     const alunos = (registros || []).map((r) => {
       const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
+      const notas = (r.notas_disciplinas || []).map((n) => ({
+        disciplina: n.disciplina,
+        nota: n.nota,
+        descricao: n.descricao,
+      }));
       return {
         registroId: r.id,
         perfilId: r.perfil_id,
         nome: p?.nome,
         cpf: p?.cpf,
-        nota: r.nota,
         faltas: r.faltas,
+        notasDisciplinas: notas,
       };
     });
 
@@ -330,7 +359,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
       const rows = (t.alunos || [])
         .map(
           (a) =>
-            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td>${a.nota}</td><td>${a.faltas}</td></tr>`
+            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td>${a.faltas}</td></tr>`
         )
         .join("");
 
@@ -356,7 +385,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
         </div>
         <p class="meta">Professor: ${profInfo}</p>
         ${discHtml}
-        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Nota</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
+        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas (0–100)</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
     .join("");
@@ -622,8 +651,8 @@ async function executarAcaoDiretor(acao, e) {
     if (!alunoId) throw new Error("Aluno não encontrado.");
 
     const upd = {};
-    if ($("#dir-nf-nota").value !== "") upd.nota = parseFloat($("#dir-nf-nota").value);
     if ($("#dir-nf-faltas").value !== "") upd.faltas = parseInt($("#dir-nf-faltas").value, 10);
+    if (!Object.keys(upd).length) throw new Error("Informe as faltas.");
 
     const { error } = await supabaseClient.from("registros_alunos").update(upd).eq("perfil_id", alunoId);
     if (error) throw error;
@@ -657,6 +686,7 @@ async function carregarTurmaProfessor() {
 
   const r = await adminGet("/api/professor/minhas-turmas");
   let turmas = r.ok ? r.turmas : null;
+  let disciplinasProfessor = r.ok ? r.disciplinas || [] : [];
 
   if (!turmas) {
     const { data: turmasDb, error } = await supabaseClient
@@ -679,6 +709,9 @@ async function carregarTurmaProfessor() {
     const todas = await listarTurmasCompletas();
     const ids = new Set(turmasDb.map((t) => t.id));
     turmas = todas.filter((t) => ids.has(t.id));
+
+    const { data: meuPerfil } = await supabaseClient.from("perfis").select("disciplina").eq("id", userId).single();
+    disciplinasProfessor = listaDisciplinas(meuPerfil?.disciplina);
   }
 
   if (!turmas?.length) {
@@ -693,6 +726,7 @@ async function carregarTurmaProfessor() {
   $("#prof-turma-titulo").textContent =
     turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
+  popularSelectDisciplinas(disciplinasProfessor);
   renderTurmas($("#prof-lista-alunos"), turmas, true);
 }
 
@@ -706,17 +740,23 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 
     if (acao === "lancar-nota") {
       const notaVal = $("#pr-nota-valor").value;
+      const disciplina = $("#pr-nota-disciplina").value;
+      const descricao = $("#pr-nota-desc").value.trim();
+      if (!disciplina) throw new Error("Selecione a disciplina.");
       if (notaVal === "") throw new Error("Informe a nota.");
       const nota = parseFloat(notaVal);
-      if (Number.isNaN(nota) || nota < 0 || nota > 10) throw new Error("Nota deve ser entre 0 e 10.");
+      if (Number.isNaN(nota) || nota < 0 || nota > 100) throw new Error("Nota deve ser entre 0 e 100.");
 
-      const { error } = await supabaseClient
-        .from("registros_alunos")
-        .update({ nota })
-        .eq("id", registroId);
-      if (error) throw error;
-      toast("Nota lançada!");
+      const r = await adminPost("/api/professor/lancar-nota", {
+        registroId,
+        disciplina,
+        nota,
+        descricao,
+      });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível lançar a nota.");
+      toast(r.mensagem || "Nota lançada!");
       $("#pr-nota-valor").value = "";
+      $("#pr-nota-desc").value = "";
     } else if (acao === "lancar-falta") {
       const { data: reg } = await supabaseClient
         .from("registros_alunos")
@@ -740,7 +780,7 @@ async function carregarDadosAluno() {
   const card = $("#aluno-card");
   const { data: reg, error } = await supabaseClient
     .from("registros_alunos")
-    .select("nota, faltas, turma:turmas(nome)")
+    .select("faltas, turma:turmas(nome), notas_disciplinas(disciplina, nota, descricao)")
     .eq("perfil_id", userId)
     .maybeSingle();
 
@@ -751,12 +791,19 @@ async function carregarDadosAluno() {
 
   const { data: perfil } = await supabaseClient.from("perfis").select("nome, cpf").eq("id", userId).single();
 
+  const notas = (reg.notas_disciplinas || []).map((n) => ({
+    disciplina: n.disciplina,
+    nota: n.nota,
+    descricao: n.descricao,
+  }));
+
   card.innerHTML = `
     <p><strong>Escola:</strong> Colégio Jardim das Acácias</p>
     <p><strong>Nome:</strong> ${escapeHtml(perfil?.nome)}</p>
     <p><strong>CPF:</strong> ${escapeHtml(perfil?.cpf || "")}</p>
     <p><strong>Turma:</strong> ${escapeHtml(reg.turma?.nome || "")}</p>
-    <p><strong>Nota:</strong> ${reg.nota}</p>
+    <p><strong>Notas:</strong></p>
+    <div class="notas-aluno">${formatNotasHtml(notas)}</div>
     <p><strong>Faltas:</strong> ${reg.faltas}</p>
   `;
 }
