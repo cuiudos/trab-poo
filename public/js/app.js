@@ -281,9 +281,8 @@ function calcularFrequenciaDisciplina(faltas, totalAulas) {
   if (total <= 0) return null;
   const limiteFaltas = Math.floor(total * 0.25);
   const percentualFaltas = Math.round((f / total) * 1000) / 10;
-  const percentualPresenca = Math.round(((total - f) / total) * 1000) / 10;
   const reprovadoFalta = f > limiteFaltas;
-  return { faltas: f, totalAulas: total, percentualFaltas, percentualPresenca, limiteFaltas, reprovadoFalta };
+  return { faltas: f, totalAulas: total, percentualFaltas, limiteFaltas, reprovadoFalta };
 }
 
 function mapFaltasLista(faltas) {
@@ -333,7 +332,7 @@ function formatFrequenciaHtml(faltasDisciplinas, aulasDisciplinas) {
       const calc = calcularFrequenciaDisciplina(faltasDisciplinas?.[disc] || 0, aulasDisciplinas[disc]);
       if (!calc) return "";
       const cls = calc.reprovadoFalta ? "freq-reprovado" : "freq-ok";
-      return `<div class="freq-item ${cls}"><strong>${escapeHtml(disc)}</strong>: ${calc.faltas}/${calc.totalAulas} faltas · ${calc.percentualFaltas}% faltas</div>`;
+      return `<div class="freq-item ${cls}"><strong>${escapeHtml(disc)}</strong>: <span class="freq-pct">${calc.percentualFaltas}% faltas</span> · ${calc.faltas}/${calc.totalAulas} aulas</div>`;
     })
     .join("");
 }

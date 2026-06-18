@@ -373,6 +373,10 @@ body {
   padding: 0.1rem 0;
 }
 
+.freq-pct {
+  font-weight: 700;
+}
+
 .freq-ok {
   color: #1e6b3a;
 }
