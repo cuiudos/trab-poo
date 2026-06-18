@@ -247,6 +247,40 @@ function formatNotasHtml(notas) {
     .join("");
 }
 
+function calcularResultadoFinal(notas) {
+  if (!notas?.length) {
+    return { pontos: 0, pontosMax: 0, percentual: null, situacao: null };
+  }
+
+  let pontos = 0;
+  let pontosMax = 0;
+  for (const n of notas) {
+    pontos += Number(n.nota) || 0;
+    pontosMax += Number(n.valorAtividade ?? 100) || 0;
+  }
+
+  if (pontosMax <= 0) {
+    return { pontos: 0, pontosMax: 0, percentual: null, situacao: null };
+  }
+
+  const percentual = Math.round((pontos / pontosMax) * 1000) / 10;
+  const situacao = percentual >= 60 ? "Aprovado" : "Reprovado";
+  return { pontos, pontosMax, percentual, situacao };
+}
+
+function formatTotalHtml(notas) {
+  const r = calcularResultadoFinal(notas);
+  if (r.percentual === null) return "—";
+  return `<strong>${r.percentual}%</strong><br><span class="meta">${r.pontos} / ${r.pontosMax} pts</span>`;
+}
+
+function formatSituacaoHtml(notas) {
+  const r = calcularResultadoFinal(notas);
+  if (!r.situacao) return "—";
+  const cls = r.situacao === "Aprovado" ? "badge-aprovado" : "badge-reprovado";
+  return `<span class="badge-situacao ${cls}">${r.situacao}</span>`;
+}
+
 function atualizarMaxNotaAluno() {
   const atv = parseFloat($("#pr-nota-valor-atv")?.value);
   const inputNota = $("#pr-nota-valor");
@@ -391,7 +425,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
       const rows = (t.alunos || [])
         .map(
           (a) =>
-            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td>${a.faltas}</td></tr>`
+            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td class="col-total">${formatTotalHtml(a.notasDisciplinas)}</td><td>${formatSituacaoHtml(a.notasDisciplinas)}</td><td>${a.faltas}</td></tr>`
         )
         .join("");
 
@@ -417,7 +451,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
         </div>
         <p class="meta">Professor: ${profInfo}</p>
         ${discHtml}
-        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas (0–100)</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
+        ${rows ? `<table class="tabela-alunos"><thead><tr><th>Aluno</th><th>CPF</th><th>Notas</th><th>Total</th><th>Situação</th><th>Faltas</th></tr></thead><tbody>${rows}</tbody></table>` : "<p class='meta'>Sem alunos</p>"}
       </div>`;
     })
     .join("");
@@ -870,6 +904,8 @@ async function carregarDadosAluno() {
     descricao: n.descricao,
   }));
 
+  const resultado = calcularResultadoFinal(notas);
+
   card.innerHTML = `
     <p><strong>Escola:</strong> Colégio Jardim das Acácias</p>
     <p><strong>Nome:</strong> ${escapeHtml(perfil?.nome)}</p>
@@ -877,6 +913,16 @@ async function carregarDadosAluno() {
     <p><strong>Turma:</strong> ${escapeHtml(reg.turma?.nome || "")}</p>
     <p><strong>Notas:</strong></p>
     <div class="notas-aluno">${formatNotasHtml(notas)}</div>
+    <p><strong>Total:</strong> ${
+      resultado.percentual !== null
+        ? `${resultado.percentual}% (${resultado.pontos} / ${resultado.pontosMax} pontos)`
+        : "Sem notas lançadas"
+    }</p>
+    <p><strong>Situação:</strong> ${
+      resultado.situacao
+        ? `<span class="badge-situacao ${resultado.situacao === "Aprovado" ? "badge-aprovado" : "badge-reprovado"}">${resultado.situacao}</span> <span class="meta">(mínimo 60% para aprovação)</span>`
+        : "—"
+    }</p>
     <p><strong>Faltas:</strong> ${reg.faltas}</p>
   `;
 }
