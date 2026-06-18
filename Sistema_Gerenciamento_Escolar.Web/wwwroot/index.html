@@ -31,7 +31,6 @@
     <main class="login-panel">
       <div class="login-card">
         <h2>Entrar</h2>
-        <p class="login-sub">Login protegido · <strong>Supabase Auth</strong></p>
 
         <div class="role-tabs" role="tablist">
           <button type="button" class="role-tab active" data-tipo="diretor">Diretor</button>
@@ -118,16 +117,6 @@
             <input type="text" id="dir-vinc-turma" placeholder="Nome da turma" />
             <button type="button" class="btn-primary btn-sm" data-acao="vincular">Vincular</button>
           </article>
-          <article class="card">
-            <h3>Editar faltas</h3>
-            <input type="text" id="dir-nf-email" class="select-full" placeholder="E-mail ou login do aluno" />
-            <input type="text" id="dir-nf-disciplina" class="select-full" placeholder="Disciplina (ex: Matemática)" />
-            <input type="number" id="dir-nf-faltas" class="select-full" placeholder="Total de faltas" min="0" />
-            <div class="acoes-faltas-dir">
-              <button type="button" class="btn-primary btn-sm" data-acao="edit-nf">Salvar total</button>
-              <button type="button" class="btn-ghost btn-sm" data-acao="remover-falta-dir">Remover 1 falta</button>
-            </div>
-          </article>
         </div>
         <section class="card card-wide">
           <div class="card-head">
@@ -163,10 +152,13 @@
               <button type="button" class="btn-primary btn-sm" data-acao="definir-aulas">Salvar aulas</button>
             </article>
             <article class="card">
-              <h3>Registrar falta</h3>
+              <h3>Faltas</h3>
               <select id="pr-falta-aluno" class="select-full"></select>
               <select id="pr-falta-disciplina" class="select-full"></select>
-              <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar falta</button>
+              <div class="acoes-faltas-dir">
+                <button type="button" class="btn-primary btn-sm" data-acao="lancar-falta">Registrar falta</button>
+                <button type="button" class="btn-ghost btn-sm" data-acao="remover-falta">Remover 1 falta</button>
+              </div>
             </article>
           </div>
           <section class="card card-wide">
@@ -222,6 +214,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=13"></script>
+  <script src="/js/app.js?v=14"></script>
 </body>
 </html>

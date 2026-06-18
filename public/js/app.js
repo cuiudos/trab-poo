@@ -809,25 +809,6 @@ async function executarAcaoDiretor(acao, e) {
     const usuarios = await obterUsuariosPorId();
     const prof = usuarios.get(profId);
     toast(`Professor vinculado! Login: ${prof?.login || $("#dir-vinc-prof").value.trim()}`);
-  } else if (acao === "edit-nf" || acao === "remover-falta-dir") {
-    const email = $("#dir-nf-email").value.trim();
-    const disciplina = $("#dir-nf-disciplina").value.trim();
-    if (!email) throw new Error("Informe o e-mail ou login do aluno.");
-    if (!disciplina) throw new Error("Informe a disciplina.");
-
-    const payload = { email, disciplina };
-    if (acao === "remover-falta-dir") {
-      payload.remover = true;
-    } else {
-      const val = $("#dir-nf-faltas").value;
-      if (val === "") throw new Error("Informe o total de faltas ou clique em Remover 1 falta.");
-      payload.faltas = parseInt(val, 10);
-      if (Number.isNaN(payload.faltas) || payload.faltas < 0) throw new Error("Faltas deve ser ≥ 0.");
-    }
-
-    const r = await adminPost("/api/admin/editar-faltas", payload);
-    if (!r.ok) throw new Error(r.mensagem || "Não foi possível atualizar as faltas.");
-    toast(r.mensagem || "Faltas atualizadas!");
   } else if (acao === "refresh-turmas") {
     await carregarTurmasDiretor();
     return;
@@ -933,7 +914,8 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       return;
     }
 
-    const registroId = acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
+    const registroId =
+      acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
     if (!registroId) throw new Error("Selecione um aluno.");
 
     if (acao === "lancar-nota") {
@@ -964,12 +946,16 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
       toast(r.mensagem || "Nota lançada!");
       $("#pr-nota-valor").value = "";
       $("#pr-nota-desc").value = "";
-    } else if (acao === "lancar-falta") {
+    } else if (acao === "lancar-falta" || acao === "remover-falta") {
       const disciplina = $("#pr-falta-disciplina").value;
       if (!disciplina) throw new Error("Selecione a disciplina.");
-      const r = await adminPost("/api/professor/lancar-falta", { registroId, disciplina });
-      if (!r.ok) throw new Error(r.mensagem || "Não foi possível registrar a falta.");
-      toast(r.mensagem || "Falta registrada!");
+      const r = await adminPost("/api/professor/lancar-falta", {
+        registroId,
+        disciplina,
+        remover: acao === "remover-falta",
+      });
+      if (!r.ok) throw new Error(r.mensagem || "Não foi possível atualizar as faltas.");
+      toast(r.mensagem || (acao === "remover-falta" ? "Falta removida!" : "Falta registrada!"));
     }
     await carregarTurmaProfessor();
   } catch (err) {

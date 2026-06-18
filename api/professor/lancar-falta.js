@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
 
   const { admin, userId, perfil } = auth;
   const body = await parseBody(req);
-  const { registroId, disciplina } = body;
+  const { registroId, disciplina, remover } = body;
 
   if (!registroId) return res.status(400).json({ ok: false, mensagem: "Aluno é obrigatório." });
   if (!disciplina?.trim()) return res.status(400).json({ ok: false, mensagem: "Disciplina é obrigatória." });
@@ -66,13 +66,33 @@ module.exports = async (req, res) => {
     });
   }
 
-  const novasFaltas = (atual?.faltas || 0) + 1;
   const limiteFaltas = Math.floor(aulasCfg.total_aulas * 0.25);
+  let novasFaltas;
 
-  if (novasFaltas > aulasCfg.total_aulas) {
-    return res.status(400).json({
-      ok: false,
-      mensagem: `Faltas não podem ultrapassar o total de ${aulasCfg.total_aulas} aulas.`,
+  if (remover) {
+    if (!atual?.faltas) {
+      return res.status(400).json({ ok: false, mensagem: "O aluno não tem faltas registradas nesta disciplina." });
+    }
+    novasFaltas = atual.faltas - 1;
+  } else {
+    novasFaltas = (atual?.faltas || 0) + 1;
+    if (novasFaltas > aulasCfg.total_aulas) {
+      return res.status(400).json({
+        ok: false,
+        mensagem: `Faltas não podem ultrapassar o total de ${aulasCfg.total_aulas} aulas.`,
+      });
+    }
+  }
+
+  if (novasFaltas === 0 && atual?.id) {
+    const { error: delErr } = await admin.from("faltas_disciplinas").delete().eq("id", atual.id);
+    if (delErr) return res.status(400).json({ ok: false, mensagem: delErr.message });
+    const freq = 100;
+    return res.json({
+      ok: true,
+      mensagem: `Falta removida em ${disc.discCanon}. Aluno sem faltas nesta disciplina (${freq}% presença).`,
+      faltas: 0,
+      frequencia: freq,
     });
   }
 
@@ -93,8 +113,10 @@ module.exports = async (req, res) => {
   }
 
   const freq = Math.round(((aulasCfg.total_aulas - novasFaltas) / aulasCfg.total_aulas) * 1000) / 10;
-  let msg = `Falta registrada em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${freq}% presença).`;
-  if (novasFaltas > limiteFaltas) {
+  let msg = remover
+    ? `Falta removida em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${freq}% presença).`
+    : `Falta registrada em ${disc.discCanon}: ${novasFaltas}/${aulasCfg.total_aulas} (${freq}% presença).`;
+  if (!remover && novasFaltas > limiteFaltas) {
     msg += " Atenção: ultrapassou 25% de faltas — reprovação por frequência.";
   }
 
