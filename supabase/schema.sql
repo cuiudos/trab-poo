@@ -86,6 +86,16 @@ create policy "perfis_select_diretor" on public.perfis
     public.meu_papel() = 'diretor' and escola_id = public.minha_escola_id()
   );
 
+drop policy if exists "perfis_select_professor" on public.perfis;
+create policy "perfis_select_professor" on public.perfis
+  for select to authenticated using (
+    exists (
+      select 1 from public.registros_alunos ra
+      join public.turmas t on t.id = ra.turma_id
+      where ra.perfil_id = perfis.id and t.professor_id = auth.uid()
+    )
+  );
+
 drop policy if exists "perfis_insert_diretor" on public.perfis;
 create policy "perfis_insert_diretor" on public.perfis
   for insert to authenticated with check (

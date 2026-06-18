@@ -290,25 +290,20 @@ async function listarTurmasCompletas() {
 
     const { data: registros } = await supabaseClient
       .from("registros_alunos")
-      .select("id, nota, faltas, perfil_id")
+      .select("id, nota, faltas, perfil_id, perfil:perfis(nome, cpf)")
       .eq("turma_id", t.id);
 
-    const alunos = [];
-    for (const r of registros || []) {
-      const { data: p } = await supabaseClient
-        .from("perfis")
-        .select("nome, cpf")
-        .eq("id", r.perfil_id)
-        .single();
-      alunos.push({
+    const alunos = (registros || []).map((r) => {
+      const p = Array.isArray(r.perfil) ? r.perfil[0] : r.perfil;
+      return {
         registroId: r.id,
         perfilId: r.perfil_id,
         nome: p?.nome,
         cpf: p?.cpf,
         nota: r.nota,
         faltas: r.faltas,
-      });
-    }
+      };
+    });
 
     resultado.push({
       id: t.id,
@@ -367,13 +362,22 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
     .join("");
 
   if (comSelect) {
-    const alunos = turmas.flatMap((t) => t.alunos || []);
+    const alunos = turmas
+      .flatMap((t) => (t.alunos || []).map((a) => ({ ...a, turmaNome: t.nome })))
+      .filter((a) => a.registroId);
+
     if (alunos.length) {
       const opts = alunos
-        .map((a) => `<option value="${a.registroId}">${escapeHtml(a.nome)}</option>`)
+        .map((a) => {
+          const label = a.turmaNome ? `${a.nome} (${a.turmaNome})` : a.nome;
+          return `<option value="${a.registroId}">${escapeHtml(label || "Aluno")}</option>`;
+        })
         .join("");
       $("#pr-nota-aluno").innerHTML = opts;
       $("#pr-falta-aluno").innerHTML = opts;
+    } else {
+      $("#pr-nota-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
+      $("#pr-falta-aluno").innerHTML = "<option value=''>Nenhum aluno na turma</option>";
     }
   }
 }
@@ -651,20 +655,36 @@ async function carregarTurmaProfessor() {
   const sem = $("#prof-sem-turma");
   const cont = $("#prof-conteudo");
 
-  const { data: turmas, error } = await supabaseClient
-    .from("turmas")
-    .select("id, nome")
-    .eq("professor_id", userId)
-    .order("nome");
+  const r = await adminGet("/api/professor/minhas-turmas");
+  let turmas = r.ok ? r.turmas : null;
 
-  if (error || !turmas?.length) {
-    const { data: authData } = await supabaseClient.auth.getUser();
-    const meuLogin = emailParaLogin(authData?.user?.email);
+  if (!turmas) {
+    const { data: turmasDb, error } = await supabaseClient
+      .from("turmas")
+      .select("id, nome")
+      .eq("professor_id", userId)
+      .order("nome");
+
+    if (error || !turmasDb?.length) {
+      const { data: authData } = await supabaseClient.auth.getUser();
+      const meuLogin = emailParaLogin(authData?.user?.email);
+      sem.hidden = false;
+      cont.hidden = true;
+      sem.innerHTML = `
+        <p><strong>Nenhuma turma vinculada ao login <code class="login-cell">${escapeHtml(meuLogin)}</code>.</strong></p>
+        <p>Se o diretor já vinculou um professor com seu nome, confira no painel dele qual <strong>login</strong> foi usado e entre com essa conta.</p>`;
+      return;
+    }
+
+    const todas = await listarTurmasCompletas();
+    const ids = new Set(turmasDb.map((t) => t.id));
+    turmas = todas.filter((t) => ids.has(t.id));
+  }
+
+  if (!turmas?.length) {
     sem.hidden = false;
     cont.hidden = true;
-    sem.innerHTML = `
-      <p><strong>Nenhuma turma vinculada ao login <code class="login-cell">${escapeHtml(meuLogin)}</code>.</strong></p>
-      <p>Se o diretor já vinculou um professor com seu nome, confira no painel dele qual <strong>login</strong> foi usado e entre com essa conta.</p>`;
+    sem.textContent = "Nenhuma turma vinculada pelo diretor.";
     return;
   }
 
@@ -673,9 +693,7 @@ async function carregarTurmaProfessor() {
   $("#prof-turma-titulo").textContent =
     turmas.length === 1 ? `Turma: ${turmas[0].nome}` : `Minhas turmas (${turmas.length})`;
 
-  const todas = await listarTurmasCompletas();
-  const ids = new Set(turmas.map((t) => t.id));
-  renderTurmas($("#prof-lista-alunos"), todas.filter((t) => ids.has(t.id)), true);
+  renderTurmas($("#prof-lista-alunos"), turmas, true);
 }
 
 document.querySelector("#painel-professor").addEventListener("click", async (e) => {
@@ -684,14 +702,21 @@ document.querySelector("#painel-professor").addEventListener("click", async (e) 
 
   try {
     const registroId = acao === "lancar-nota" ? $("#pr-nota-aluno").value : $("#pr-falta-aluno").value;
+    if (!registroId) throw new Error("Selecione um aluno.");
 
     if (acao === "lancar-nota") {
+      const notaVal = $("#pr-nota-valor").value;
+      if (notaVal === "") throw new Error("Informe a nota.");
+      const nota = parseFloat(notaVal);
+      if (Number.isNaN(nota) || nota < 0 || nota > 10) throw new Error("Nota deve ser entre 0 e 10.");
+
       const { error } = await supabaseClient
         .from("registros_alunos")
-        .update({ nota: parseFloat($("#pr-nota-valor").value) })
+        .update({ nota })
         .eq("id", registroId);
       if (error) throw error;
       toast("Nota lançada!");
+      $("#pr-nota-valor").value = "";
     } else if (acao === "lancar-falta") {
       const { data: reg } = await supabaseClient
         .from("registros_alunos")
