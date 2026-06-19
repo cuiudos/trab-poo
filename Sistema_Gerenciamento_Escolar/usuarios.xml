@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <SistemaGerenciamentoEscolar>
   <Diretor>
     <Usuario login="diretor1" senha="diretor123">
@@ -17,7 +17,22 @@
     <Aluno login="alunos123" senha="alunos123">
       <Nome>Pedro Henrique Alves Emerick</Nome>
       <Cpf>66666666666</Cpf>
+      <Matricula>2026001</Matricula>
       <Turma>3º Ano A</Turma>
+      <Responsavel>
+        <Nome>Maria Emerick</Nome>
+        <Telefone>11999990001</Telefone>
+      </Responsavel>
+    </Aluno>
+    <Aluno login="gustavin12" senha="1234">
+      <Nome>Gustavo Silva</Nome>
+      <Cpf>11111111112</Cpf>
+      <Matricula>2026002</Matricula>
+      <Turma>Terceiro B°</Turma>
+      <Responsavel>
+        <Nome>João Silva</Nome>
+        <Telefone>11999990002</Telefone>
+      </Responsavel>
     </Aluno>
   </Alunos>
 </SistemaGerenciamentoEscolar>

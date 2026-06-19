@@ -1,4 +1,5 @@
 ﻿using Sistema_Gerenciamento_Escolar.Enums;
+using Sistema_Gerenciamento_Escolar.Helpers;
 using Sistema_Gerenciamento_Escolar.Models;
 using Sistema_Gerenciamento_Escolar.Results;
 using Sistema_Gerenciamento_Escolar.Services;
@@ -7,77 +8,109 @@ class Program
 {
     static void Main()
     {
-        var autenticacao = new ServicoAutenticacaoXml();
-        autenticacao.Carregar();
-
-        var credencialDiretor = autenticacao.ObterDiretor();
-        if (credencialDiretor == null)
+        try
         {
-            Console.WriteLine("Nenhum diretor cadastrado no arquivo usuarios.xml.");
-            return;
+            var autenticacao = new ServicoAutenticacaoXml();
+
+            if (!autenticacao.TentarCarregar(out string erroCarregar))
+            {
+                Console.WriteLine(erroCarregar);
+                return;
+            }
+
+            var credencialDiretor = autenticacao.ObterDiretor();
+            if (credencialDiretor == null)
+            {
+                Console.WriteLine("Nenhum diretor cadastrado no arquivo usuarios.xml.");
+                return;
+            }
+
+            Diretor diretor = new Diretor(credencialDiretor.Nome, credencialDiretor.Cpf);
+            InicializarDadosExemplo(diretor, autenticacao);
+
+            Console.WriteLine($"\nInstituição: {diretor.Instituicao.Nome}");
+
+            int funcao;
+
+            do
+            {
+                try
+                {
+                    Console.WriteLine("\n=== Sistema de Gerenciamento Escolar ===");
+                    Console.WriteLine("Qual seu perfil de acesso?");
+                    Console.WriteLine("1 - Diretor");
+                    Console.WriteLine("2 - Professor");
+                    Console.WriteLine("3 - Aluno");
+                    Console.WriteLine("4 - Sair");
+                    Console.Write("\nOpção: ");
+
+                    if (!int.TryParse(Console.ReadLine(), out funcao))
+                    {
+                        Console.WriteLine("Opção inválida.");
+                        continue;
+                    }
+
+                    switch (funcao)
+                    {
+                        case 1:
+                            MenuDiretor(diretor, autenticacao);
+                            break;
+                        case 2:
+                            MenuProfessor(diretor, autenticacao);
+                            break;
+                        case 3:
+                            MenuAluno(diretor, autenticacao);
+                            break;
+                        case 4:
+                            Console.WriteLine("Encerrando o sistema...");
+                            break;
+                        default:
+                            Console.WriteLine("Opção inválida.");
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erro durante a operação: {ex.Message}");
+                    funcao = 0;
+                }
+
+            } while (funcao != 4);
         }
-
-        Diretor diretor = new Diretor(credencialDiretor.Nome, credencialDiretor.Cpf);
-        InicializarDadosExemplo(diretor, autenticacao);
-
-        int funcao;
-
-        do
+        catch (Exception ex)
         {
-            Console.WriteLine("\n=== Sistema de Gerenciamento Escolar ===");
-            Console.WriteLine("Qual seu perfil de acesso?");
-            Console.WriteLine("1 - Diretor");
-            Console.WriteLine("2 - Professor");
-            Console.WriteLine("3 - Aluno");
-            Console.WriteLine("4 - Sair");
-            Console.Write("\nOpção: ");
-
-            if (!int.TryParse(Console.ReadLine(), out funcao))
-            {
-                Console.WriteLine("Opção inválida.");
-                continue;
-            }
-
-            switch (funcao)
-            {
-                case 1:
-                    MenuDiretor(diretor, autenticacao);
-                    break;
-                case 2:
-                    MenuProfessor(diretor, autenticacao);
-                    break;
-                case 3:
-                    MenuAluno(diretor, autenticacao);
-                    break;
-                case 4:
-                    Console.WriteLine("Encerrando o sistema...");
-                    break;
-                default:
-                    Console.WriteLine("Opção inválida.");
-                    break;
-            }
-
-        } while (funcao != 4);
+            Console.WriteLine($"Erro fatal ao iniciar o sistema: {ex.Message}");
+        }
     }
 
     static bool RealizarLogin(ServicoAutenticacaoXml autenticacao, TipoAcesso tipo, out ResultadoAutenticacao? resultado)
     {
-        Console.WriteLine("\n--- Login (credenciais em usuarios.xml) ---");
-        Console.Write("Usuário: ");
-        string usuario = Console.ReadLine() ?? "";
-        Console.Write("Senha: ");
-        string senha = Console.ReadLine() ?? "";
+        resultado = null;
 
-        resultado = autenticacao.Autenticar(tipo, usuario, senha);
-
-        if (!resultado.Sucesso)
+        try
         {
+            Console.WriteLine("\n--- Login (credenciais em usuarios.xml) ---");
+            Console.Write("Usuário: ");
+            string usuario = Console.ReadLine() ?? "";
+            Console.Write("Senha: ");
+            string senha = Console.ReadLine() ?? "";
+
+            resultado = autenticacao.Autenticar(tipo, usuario, senha);
+
+            if (!resultado.Sucesso)
+            {
+                Console.WriteLine(resultado.Mensagem);
+                return false;
+            }
+
             Console.WriteLine(resultado.Mensagem);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro no login: {ex.Message}");
             return false;
         }
-
-        Console.WriteLine(resultado.Mensagem);
-        return true;
     }
 
     static void MenuDiretor(Diretor diretor, ServicoAutenticacaoXml autenticacao)
@@ -113,41 +146,82 @@ class Program
             switch (opcao)
             {
                 case 1:
-                    Console.Write("Nome da turma: ");
-                    string nomeTurma = Console.ReadLine() ?? "";
-                    diretor.CadastrarTurmma(nomeTurma);
+                    try
+                    {
+                        Console.Write("Nome da turma: ");
+                        string nomeTurma = Console.ReadLine() ?? "";
+                        diretor.CadastrarTurmma(nomeTurma);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao cadastrar turma: {ex.Message}");
+                    }
                     break;
 
                 case 2:
-                    Console.Write("Nome do aluno: ");
-                    nome = Console.ReadLine() ?? "";
-                    Console.Write("CPF do aluno: ");
-                    cpf = Console.ReadLine() ?? "";
-                    Console.Write("Turma: ");
-                    turma = Console.ReadLine() ?? "";
-                    Console.Write("Usuário de login: ");
-                    string usuarioAluno = Console.ReadLine() ?? "";
-                    Console.Write("Senha de login: ");
-                    string senhaAluno = Console.ReadLine() ?? "";
+                    try
+                    {
+                        Console.Write("Nome do aluno: ");
+                        nome = Console.ReadLine() ?? "";
+                        cpf = LerCpf("CPF do aluno (11 números): ");
+                        Console.Write("Matrícula: ");
+                        string matricula = Console.ReadLine() ?? "";
+                        Console.Write("Nome do responsável: ");
+                        string responsavelNome = Console.ReadLine() ?? "";
+                        Console.Write("Telefone do responsável: ");
+                        string responsavelTelefone = Console.ReadLine() ?? "";
+                        Console.Write("Turma: ");
+                        turma = Console.ReadLine() ?? "";
+                        Console.Write("Usuário de login: ");
+                        string usuarioAluno = Console.ReadLine() ?? "";
+                        Console.Write("Senha de login: ");
+                        string senhaAluno = Console.ReadLine() ?? "";
 
-                    diretor.CadastrarAluno(nome, cpf, turma);
-                    autenticacao.SalvarNovoAluno(nome, cpf, turma, usuarioAluno, senhaAluno);
+                        if (string.IsNullOrWhiteSpace(usuarioAluno) || string.IsNullOrWhiteSpace(senhaAluno))
+                        {
+                            Console.WriteLine("Usuário e senha são obrigatórios para salvar no usuarios.xml.");
+                            break;
+                        }
+
+                        var responsavel = new Responsavel(responsavelNome, responsavelTelefone);
+                        var usuario = new Usuario(usuarioAluno);
+
+                        if (diretor.CadastrarAluno(nome, cpf, turma, matricula, responsavel, usuario))
+                            autenticacao.SalvarNovoAluno(nome, cpf, turma, matricula, responsavelNome,
+                                responsavelTelefone, usuarioAluno, senhaAluno);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao cadastrar aluno: {ex.Message}");
+                    }
                     break;
 
                 case 3:
-                    Console.Write("Nome do professor: ");
-                    nome = Console.ReadLine() ?? "";
-                    Console.Write("CPF do professor: ");
-                    cpf = Console.ReadLine() ?? "";
-                    Console.Write("Disciplina: ");
-                    string disciplina = Console.ReadLine() ?? "";
-                    Console.Write("Usuário de login: ");
-                    string usuarioProf = Console.ReadLine() ?? "";
-                    Console.Write("Senha de login: ");
-                    string senhaProf = Console.ReadLine() ?? "";
+                    try
+                    {
+                        Console.Write("Nome do professor: ");
+                        nome = Console.ReadLine() ?? "";
+                        cpf = LerCpf("CPF do professor (11 números): ");
+                        Console.Write("Disciplina: ");
+                        string disciplina = Console.ReadLine() ?? "";
+                        Console.Write("Usuário de login: ");
+                        string usuarioProf = Console.ReadLine() ?? "";
+                        Console.Write("Senha de login: ");
+                        string senhaProf = Console.ReadLine() ?? "";
 
-                    diretor.CadastrarProfessor(nome, cpf, disciplina);
-                    autenticacao.SalvarNovoProfessor(nome, cpf, disciplina, usuarioProf, senhaProf);
+                        if (string.IsNullOrWhiteSpace(usuarioProf) || string.IsNullOrWhiteSpace(senhaProf))
+                        {
+                            Console.WriteLine("Usuário e senha são obrigatórios para salvar no usuarios.xml.");
+                            break;
+                        }
+
+                        if (diretor.CadastrarProfessor(nome, cpf, disciplina))
+                            autenticacao.SalvarNovoProfessor(nome, cpf, disciplina, usuarioProf, senhaProf);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erro ao cadastrar professor: {ex.Message}");
+                    }
                     break;
 
                 case 4:
@@ -187,8 +261,7 @@ class Program
                     string alunoAtual = Console.ReadLine() ?? "";
                     Console.Write("Novo nome: ");
                     string alunoNovo = Console.ReadLine() ?? "";
-                    Console.Write("Novo CPF: ");
-                    string cpfNovo = Console.ReadLine() ?? "";
+                    string cpfNovo = LerCpf("Novo CPF (11 números): ");
                     Console.Write("Nova turma: ");
                     string turmaAluno = Console.ReadLine() ?? "";
                     diretor.EditarAluno(alunoAtual, alunoNovo, cpfNovo, turmaAluno);
@@ -212,8 +285,7 @@ class Program
                     string profAtual = Console.ReadLine() ?? "";
                     Console.Write("Novo nome: ");
                     string profNovo = Console.ReadLine() ?? "";
-                    Console.Write("Novo CPF: ");
-                    string cpfProf = Console.ReadLine() ?? "";
+                    string cpfProf = LerCpf("Novo CPF (11 números): ");
                     Console.Write("Nova disciplina: ");
                     string discNova = Console.ReadLine() ?? "";
                     diretor.EditarProfessor(profAtual, profNovo, cpfProf, discNova);
@@ -336,36 +408,76 @@ class Program
         }
 
         Console.WriteLine("\n--- Suas informações (somente leitura) ---");
+        Console.WriteLine($"Instituição: {diretor.Instituicao.Nome}");
         Console.WriteLine($"Nome: {alunoLogado.GetNome()}");
         Console.WriteLine($"CPF: {alunoLogado.GetCPF()}");
-        alunoLogado.VisualizarNotaeFalta();
+        Console.WriteLine($"Matrícula: {alunoLogado.Matricula}");
+        Console.WriteLine($"Usuário: {alunoLogado.UsuarioLogin?.Login ?? login!.Credencial!.Login}");
+        Console.WriteLine($"Responsável: {alunoLogado.Responsavel.Nome} ({alunoLogado.Responsavel.Telefone})");
+        alunoLogado.VisualizarBoletim(diretor.Instituicao.Nome);
         Console.WriteLine("\nPressione Enter para voltar...");
         Console.ReadLine();
     }
 
     static void InicializarDadosExemplo(Diretor diretor, ServicoAutenticacaoXml autenticacao)
     {
-        if (diretor.Turmas.Count > 0)
-            return;
-
-        diretor.CadastrarTurmma("3º Ano A");
-
-        foreach (var profXml in autenticacao.ObterProfessoresXml())
+        try
         {
-            if (profXml.Disciplina != null &&
-                !diretor.Professores.Any(p => p.GetNome() == profXml.Nome))
+            if (diretor.Turmas.Count > 0)
+                return;
+
+            diretor.CadastrarTurmma("3º Ano A");
+
+            foreach (var profXml in autenticacao.ObterProfessoresXml())
             {
-                diretor.CadastrarProfessor(profXml.Nome, profXml.Cpf, profXml.Disciplina);
+                if (profXml.Disciplina != null &&
+                    !diretor.Professores.Any(p => p.GetNome() == profXml.Nome))
+                {
+                    diretor.CadastrarProfessor(profXml.Nome, profXml.Cpf, profXml.Disciplina);
+                }
+            }
+
+            if (diretor.Professores.Count > 0)
+                diretor.VincularProfessorTurma(diretor.Professores[0], "3º Ano A");
+
+            foreach (var alunoXml in autenticacao.ObterAlunosXml())
+            {
+                if (!string.IsNullOrEmpty(alunoXml.Turma))
+                {
+                    var responsavel = new Responsavel(
+                        alunoXml.ResponsavelNome ?? "",
+                        alunoXml.ResponsavelTelefone ?? "");
+                    var usuario = string.IsNullOrWhiteSpace(alunoXml.Login)
+                        ? null
+                        : new Usuario(alunoXml.Login);
+
+                    diretor.CadastrarAluno(
+                        alunoXml.Nome,
+                        alunoXml.Cpf,
+                        alunoXml.Turma,
+                        alunoXml.Matricula ?? $"MAT-{alunoXml.Cpf[^4..]}",
+                        responsavel,
+                        usuario);
+                }
             }
         }
-
-        if (diretor.Professores.Count > 0)
-            diretor.VincularProfessorTurma(diretor.Professores[0], "3º Ano A");
-
-        foreach (var alunoXml in autenticacao.ObterAlunosXml())
+        catch (Exception ex)
         {
-            if (!string.IsNullOrEmpty(alunoXml.Turma))
-                diretor.CadastrarAluno(alunoXml.Nome, alunoXml.Cpf, alunoXml.Turma);
+            Console.WriteLine($"Erro ao carregar dados iniciais: {ex.Message}");
+        }
+    }
+
+    static string LerCpf(string rotulo)
+    {
+        while (true)
+        {
+            Console.Write(rotulo);
+            string entrada = Console.ReadLine() ?? "";
+
+            if (ValidadorCpf.TentarNormalizar(entrada, out string cpf, out string erro))
+                return cpf;
+
+            Console.WriteLine(erro);
         }
     }
 }

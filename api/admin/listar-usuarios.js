@@ -4,7 +4,12 @@ const { listaDisciplinas } = require("../_lib/disciplinas");
 
 function extrairTurmaAluno(registros) {
   const reg = Array.isArray(registros) ? registros[0] : registros;
-  return reg?.turma?.nome || null;
+  return {
+    turma: reg?.turma?.nome || null,
+    matricula: reg?.matricula || null,
+    responsavelNome: reg?.responsavel_nome || null,
+    responsavelTelefone: reg?.responsavel_telefone || null,
+  };
 }
 
 function extrairTurmasProfessor(turmas) {
@@ -22,7 +27,7 @@ module.exports = async (req, res) => {
     .from("perfis")
     .select(`
       id, nome, cpf, role, disciplina,
-      registros_alunos ( turma:turmas ( nome ) ),
+      registros_alunos ( matricula, responsavel_nome, responsavel_telefone, turma:turmas ( nome ) ),
       turmas ( nome )
     `)
     .eq("escola_id", auth.escolaId)
@@ -41,6 +46,8 @@ module.exports = async (req, res) => {
     const disciplinas = listaDisciplinas(p.disciplina);
     const turmasProfessor = extrairTurmasProfessor(p.turmas);
 
+    const registroAluno = extrairTurmaAluno(p.registros_alunos);
+
     return {
       id: p.id,
       nome: p.nome,
@@ -50,7 +57,10 @@ module.exports = async (req, res) => {
       role: p.role,
       disciplina: p.disciplina,
       disciplinas,
-      turmaAluno: extrairTurmaAluno(p.registros_alunos),
+      turmaAluno: registroAluno.turma,
+      matricula: registroAluno.matricula,
+      responsavelNome: registroAluno.responsavelNome,
+      responsavelTelefone: registroAluno.responsavelTelefone,
       turmasProfessor,
     };
   });

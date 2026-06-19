@@ -14,4 +14,7 @@ public class CredencialUsuario
     public string Cpf { get; init; } = "";
     public string? Disciplina { get; init; }
     public string? Turma { get; init; }
+    public string? Matricula { get; init; }
+    public string? ResponsavelNome { get; init; }
+    public string? ResponsavelTelefone { get; init; }
 }

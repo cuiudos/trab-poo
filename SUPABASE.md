@@ -12,9 +12,14 @@ Login seguro com **Supabase Auth** (senha criptografada, JWT, sessão renovável
 
 ## 2. Criar tabelas
 
-No **SQL Editor**, cole e execute o arquivo:
+No **SQL Editor**, cole e execute os arquivos na ordem:
 
-`supabase/schema.sql`
+1. `supabase/schema.sql`
+2. Migrações do projeto (conforme funcionalidades usadas), incluindo:
+   - `migracao-notas-disciplinas.sql`
+   - `migracao-frequencia-disciplinas.sql`
+   - `migracao-atividades-turma.sql`
+   - `migracao-aluno-matricula-responsavel.sql` (matrícula e responsável do aluno)
 
 ## 3. Variáveis na Vercel
 

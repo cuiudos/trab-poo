@@ -1,12 +1,16 @@
 namespace Sistema_Gerenciamento_Escolar.Models;
 
+using Sistema_Gerenciamento_Escolar.Helpers;
+
 public class Diretor : DadosPessoais
 {
+    public Instituicao Instituicao { get; set; }
     public List<Turma> Turmas { get; set; }
     public List<Professor> Professores { get; set; }
 
     public Diretor(string Nome, string CPF) : base(Nome, CPF)
     {
+        Instituicao = new Instituicao("Colégio Jardim das Acácias");
         Turmas = new List<Turma>();
         Professores = new List<Professor>();
     }
@@ -17,9 +21,34 @@ public class Diretor : DadosPessoais
         Turmas.Add(turma);
     }
 
-    public void CadastrarAluno(string nome, string CPF, string NomeTurma)
+    public bool CadastrarAluno(string nome, string CPF, string NomeTurma, string matricula,
+        Responsavel responsavel, Usuario? usuarioLogin)
     {
-        Aluno aluno = new Aluno(nome, CPF);
+        if (!ValidadorCpf.TentarNormalizar(CPF, out string cpf, out string erroCpf))
+        {
+            Console.WriteLine(erroCpf);
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(matricula))
+        {
+            Console.WriteLine("Matrícula é obrigatória.");
+            return false;
+        }
+
+        if (MatriculaJaCadastrada(matricula))
+        {
+            Console.WriteLine("Matrícula já cadastrada no sistema.");
+            return false;
+        }
+
+        if (CpfJaCadastrado(cpf))
+        {
+            Console.WriteLine("CPF já cadastrado no sistema.");
+            return false;
+        }
+
+        Aluno aluno = new Aluno(nome, cpf, matricula.Trim(), responsavel, usuarioLogin);
 
         foreach (Turma x in Turmas)
         {
@@ -27,19 +56,33 @@ public class Diretor : DadosPessoais
             {
                 x.Alunos.Add(aluno);
                 Console.WriteLine("Aluno cadastrado!");
-                return;
+                return true;
             }
         }
 
         Console.WriteLine("Turma não encontrada!");
+        return false;
     }
 
-    public void CadastrarProfessor(string nome, string CPF, string Disciplina)
+    public bool CadastrarProfessor(string nome, string CPF, string Disciplina)
     {
-        Professor professor = new Professor(nome, CPF, Disciplina);
+        if (!ValidadorCpf.TentarNormalizar(CPF, out string cpf, out string erroCpf))
+        {
+            Console.WriteLine(erroCpf);
+            return false;
+        }
+
+        if (CpfJaCadastrado(cpf))
+        {
+            Console.WriteLine("CPF já cadastrado no sistema.");
+            return false;
+        }
+
+        Professor professor = new Professor(nome, cpf, Disciplina);
         Professores.Add(professor);
 
         Console.WriteLine("Professor cadastrado!");
+        return true;
     }
 
     public void VincularProfessorTurma(Professor professor, string nomeTurma)
@@ -70,7 +113,7 @@ public class Diretor : DadosPessoais
         foreach (Turma turma in Turmas)
         {
             Console.WriteLine($"\n--- Turma: {turma.Nome} ---");
-            Console.WriteLine($"Professor: {(turma.professor != null ? turma.professor.GetNome() + " (" + turma.professor.Disciplina + ")" : "Não vinculado")}");
+            Console.WriteLine($"Professor: {(turma.professor != null ? turma.professor.GetNome() + " (" + turma.professor.Disciplina.Nome + ")" : "Não vinculado")}");
 
             if (turma.Alunos.Count == 0)
             {
@@ -80,7 +123,8 @@ public class Diretor : DadosPessoais
 
             foreach (Aluno aluno in turma.Alunos)
             {
-                Console.WriteLine($"  Aluno: {aluno.GetNome()} | CPF: {aluno.GetCPF()} | Nota: {aluno.Nota} | Faltas: {aluno.Faltas}");
+                Console.WriteLine($"  Aluno: {aluno.GetNome()} | Matrícula: {aluno.Matricula} | CPF: {aluno.GetCPF()} | Responsável: {aluno.Responsavel.Nome}");
+                aluno.VisualizarNotaeFalta();
             }
         }
     }
@@ -140,6 +184,18 @@ public class Diretor : DadosPessoais
             return;
         }
 
+        if (!ValidadorCpf.TentarNormalizar(novoCpf, out string cpf, out string erroCpf))
+        {
+            Console.WriteLine(erroCpf);
+            return;
+        }
+
+        if (CpfJaCadastrado(cpf, aluno.GetCPF()))
+        {
+            Console.WriteLine("CPF já cadastrado no sistema.");
+            return;
+        }
+
         Turma? turmaDestino = BuscarTurma(novaTurma);
         if (turmaDestino == null)
         {
@@ -148,7 +204,7 @@ public class Diretor : DadosPessoais
         }
 
         aluno.SetNome(novoNome);
-        aluno.SetCPF(novoCpf);
+        aluno.SetCPF(cpf);
 
         if (turmaOrigem != turmaDestino)
         {
@@ -167,10 +223,25 @@ public class Diretor : DadosPessoais
             {
                 if (aluno.GetNome() == nomeAluno)
                 {
+                    var registro = aluno.Boletim.ObterRegistro("Geral")
+                        ?? aluno.Boletim.Registros.FirstOrDefault();
+
                     if (nota.HasValue)
-                        aluno.Nota = nota.Value;
+                    {
+                        if (registro != null)
+                            registro.Nota.Valor = nota.Value;
+                        else
+                            aluno.Boletim.LancarNota("Geral", nota.Value);
+                    }
+
                     if (faltas.HasValue)
-                        aluno.Faltas = faltas.Value;
+                    {
+                        if (registro != null)
+                            registro.Falta.Quantidade = faltas.Value;
+                        else
+                            aluno.Boletim.DefinirFaltas("Geral", faltas.Value);
+                    }
+
                     Console.WriteLine("Notas/faltas do aluno atualizadas!");
                     return;
                 }
@@ -199,9 +270,66 @@ public class Diretor : DadosPessoais
             return;
         }
 
+        if (!ValidadorCpf.TentarNormalizar(novoCpf, out string cpf, out string erroCpf))
+        {
+            Console.WriteLine(erroCpf);
+            return;
+        }
+
+        if (CpfJaCadastrado(cpf, professor.GetCPF()))
+        {
+            Console.WriteLine("CPF já cadastrado no sistema.");
+            return;
+        }
+
         professor.SetNome(novoNome);
-        professor.SetCPF(novoCpf);
-        professor.Disciplina = novaDisciplina;
+        professor.SetCPF(cpf);
+        professor.Disciplina = new Disciplina(novaDisciplina);
         Console.WriteLine("Professor atualizado!");
+    }
+
+    private bool CpfJaCadastrado(string cpf, string? cpfIgnorar = null)
+    {
+        if (cpfIgnorar != null && cpf == cpfIgnorar)
+            return false;
+
+        if (GetCPF() == cpf)
+            return true;
+
+        foreach (Professor professor in Professores)
+        {
+            if (professor.GetCPF() == cpf)
+                return true;
+        }
+
+        foreach (Turma turma in Turmas)
+        {
+            foreach (Aluno aluno in turma.Alunos)
+            {
+                if (aluno.GetCPF() == cpf)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool MatriculaJaCadastrada(string matricula, string? matriculaIgnorar = null)
+    {
+        matricula = matricula.Trim();
+
+        if (matriculaIgnorar != null && matricula == matriculaIgnorar.Trim())
+            return false;
+
+        foreach (Turma turma in Turmas)
+        {
+            foreach (Aluno aluno in turma.Alunos)
+            {
+                if (aluno.Matricula == matricula)
+                    return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -519,7 +519,12 @@ function infoExtraUsuario(u) {
     if (turmas) partes.push(`Turmas: ${turmas}`);
     return partes.join(" · ") || "—";
   }
-  if (u.role === "aluno") return u.turmaAluno || "Sem turma";
+  if (u.role === "aluno") {
+    const partes = [u.turmaAluno || "Sem turma"];
+    if (u.matricula) partes.push(`Matr. ${u.matricula}`);
+    if (u.responsavelNome) partes.push(`Resp. ${u.responsavelNome}`);
+    return partes.join(" · ");
+  }
   return "—";
 }
 
@@ -954,11 +959,17 @@ function abrirModalEditar(usuario) {
   $("#edit-user-role").value = usuario.role;
   $("#edit-nome").value = usuario.nome || "";
   $("#edit-cpf").value = usuario.cpf || "";
+  $("#edit-matricula").value = usuario.matricula || "";
+  $("#edit-responsavel").value = usuario.responsavelNome || "";
+  $("#edit-responsavel-tel").value = usuario.responsavelTelefone || "";
   $("#edit-senha").value = "";
   $("#edit-disciplinas").value = (usuario.disciplinas || listaDisciplinas(usuario.disciplina)).join(", ");
   $("#edit-turma").value = usuario.turmaAluno || "";
   $("#edit-campo-disciplinas").hidden = usuario.role !== "professor";
   $("#edit-campo-turma").hidden = usuario.role !== "aluno";
+  $("#edit-campo-matricula").hidden = usuario.role !== "aluno";
+  $("#edit-campo-responsavel").hidden = usuario.role !== "aluno";
+  $("#edit-campo-responsavel-tel").hidden = usuario.role !== "aluno";
   $("#modal-titulo").textContent = `Editar ${labelPerfil(usuario.role).toLowerCase()}`;
   $("#modal-editar-usuario").hidden = false;
 }
@@ -1051,6 +1062,9 @@ async function executarAcaoDiretor(acao, e) {
       id,
       nome: $("#edit-nome").value,
       cpf: $("#edit-cpf").value,
+      matricula: $("#edit-matricula").value,
+      responsavelNome: $("#edit-responsavel").value,
+      responsavelTelefone: $("#edit-responsavel-tel").value,
     };
     if (role === "professor") body.disciplina = $("#edit-disciplinas").value;
     if (role === "aluno") body.turmaNome = $("#edit-turma").value;
@@ -1084,6 +1098,9 @@ async function executarAcaoDiretor(acao, e) {
       password: $("#dir-al-pass").value,
       nome: $("#dir-al-nome").value,
       cpf: $("#dir-al-cpf").value,
+      matricula: $("#dir-al-matricula").value,
+      responsavelNome: $("#dir-al-responsavel").value,
+      responsavelTelefone: $("#dir-al-responsavel-tel").value,
       role: "aluno",
       turmaNome: $("#dir-al-turma").value,
     });
@@ -1423,7 +1440,7 @@ async function carregarDadosAluno() {
   const comNotas = await supabaseClient
     .from("registros_alunos")
     .select(
-      "turma_id, faltas, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao), faltas_disciplinas(disciplina, faltas)"
+      "turma_id, faltas, matricula, responsavel_nome, responsavel_telefone, turma:turmas(nome), notas_disciplinas(disciplina, valor_atividade, nota, descricao), faltas_disciplinas(disciplina, faltas)"
     )
     .eq("perfil_id", userId)
     .maybeSingle();
@@ -1460,7 +1477,14 @@ async function carregarDadosAluno() {
     return;
   }
 
-  const { data: perfil } = await supabaseClient.from("perfis").select("nome, cpf").eq("id", userId).single();
+  const { data: perfil } = await supabaseClient
+    .from("perfis")
+    .select("nome, cpf")
+    .eq("id", userId)
+    .single();
+
+  const { data: authUser } = await supabaseClient.auth.getUser();
+  const loginAluno = authUser?.user?.email?.split("@")[0] || "—";
 
   const notas = (reg.notas_disciplinas || []).map((n) => ({
     disciplina: n.disciplina,
@@ -1473,7 +1497,7 @@ async function carregarDadosAluno() {
   const aulasDisciplinas = reg.turma_id ? await buscarAulasTurma(reg.turma_id) : {};
   const resultado = calcularSituacaoCompleta(notas, faltasDisciplinas, aulasDisciplinas);
 
-  container.innerHTML = renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado);
+  container.innerHTML = renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado, loginAluno);
 }
 
 function renderBarraDash(percentual, clsExtra = "") {
@@ -1558,7 +1582,7 @@ function renderBlocoDisciplinaAluno(disc, notas, faltasDisciplinas, aulasDiscipl
     </article>`;
 }
 
-function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado) {
+function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDisciplinas, resultado, loginAluno) {
   const situacaoCls = resultado.situacaoFinal?.startsWith("Aprovado") ? "badge-aprovado" : "badge-reprovado";
   const disciplinas = disciplinasDoAluno(notas, faltasDisciplinas, aulasDisciplinas);
 
@@ -1573,10 +1597,13 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
       <article class="card aluno-info-card">
         <h3>Perfil</h3>
         <dl class="aluno-dl">
-          <div><dt>Escola</dt><dd>Colégio Jardim das Acácias</dd></div>
+          <div><dt>Instituição</dt><dd>Colégio Jardim das Acácias</dd></div>
           <div><dt>Nome</dt><dd>${escapeHtml(perfil?.nome)}</dd></div>
+          <div><dt>Usuário</dt><dd>${escapeHtml(loginAluno)}</dd></div>
+          <div><dt>Matrícula</dt><dd>${escapeHtml(reg.matricula || "—")}</dd></div>
           <div><dt>CPF</dt><dd>${escapeHtml(perfil?.cpf || "—")}</dd></div>
           <div><dt>Turma</dt><dd>${escapeHtml(reg.turma?.nome || "—")}</dd></div>
+          <div><dt>Responsável</dt><dd>${escapeHtml(reg.responsavel_nome || "—")}${reg.responsavel_telefone ? ` (${escapeHtml(reg.responsavel_telefone)})` : ""}</dd></div>
         </dl>
       </article>
 
@@ -1598,7 +1625,7 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
       </article>
 
       <section class="card dash-panel-wide aluno-materias-section">
-        <h3>Minhas matérias</h3>
+        <h3>Boletim</h3>
         <div class="aluno-disciplinas-grid">${blocosDisc}</div>
       </section>
     </div>`;

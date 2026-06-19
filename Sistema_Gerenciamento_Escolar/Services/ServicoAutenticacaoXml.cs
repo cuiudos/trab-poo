@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using Sistema_Gerenciamento_Escolar.Enums;
+using Sistema_Gerenciamento_Escolar.Helpers;
 using Sistema_Gerenciamento_Escolar.Results;
 
 namespace Sistema_Gerenciamento_Escolar.Services;
@@ -12,19 +13,42 @@ public class ServicoAutenticacaoXml
 
     public void Carregar()
     {
-        _caminhoArquivo = Path.Combine(AppContext.BaseDirectory, NomeArquivo);
+        if (!TentarCarregar(out string mensagemErro))
+            throw new InvalidOperationException(mensagemErro);
+    }
 
-        if (!File.Exists(_caminhoArquivo))
+    public bool TentarCarregar(out string mensagemErro)
+    {
+        mensagemErro = "";
+
+        try
         {
-            string caminhoProjeto = Path.Combine(Directory.GetCurrentDirectory(), NomeArquivo);
-            if (File.Exists(caminhoProjeto))
-                _caminhoArquivo = caminhoProjeto;
+            _caminhoArquivo = ResolverCaminhoArquivo();
+
+            if (!File.Exists(_caminhoArquivo))
+            {
+                mensagemErro = $"Arquivo {NomeArquivo} não encontrado.";
+                return false;
+            }
+
+            _documento = XDocument.Load(_caminhoArquivo);
+            return true;
         }
-
-        if (!File.Exists(_caminhoArquivo))
-            throw new FileNotFoundException($"Arquivo {NomeArquivo} não encontrado.", _caminhoArquivo);
-
-        _documento = XDocument.Load(_caminhoArquivo);
+        catch (System.Xml.XmlException ex)
+        {
+            mensagemErro = $"Arquivo {NomeArquivo} inválido ou corrompido: {ex.Message}";
+            return false;
+        }
+        catch (IOException ex)
+        {
+            mensagemErro = $"Erro ao ler {NomeArquivo}: {ex.Message}";
+            return false;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            mensagemErro = $"Sem permissão para ler {NomeArquivo}: {ex.Message}";
+            return false;
+        }
     }
 
     public CredencialUsuario? ObterDiretor()
@@ -75,20 +99,28 @@ public class ServicoAutenticacaoXml
                 Login = (string?)aluno.Attribute("login") ?? "",
                 Nome = aluno.Element("Nome")?.Value ?? "",
                 Cpf = aluno.Element("Cpf")?.Value ?? "",
-                Turma = aluno.Element("Turma")?.Value
+                Turma = aluno.Element("Turma")?.Value,
+                Matricula = aluno.Element("Matricula")?.Value,
+                ResponsavelNome = aluno.Element("Responsavel")?.Element("Nome")?.Value,
+                ResponsavelTelefone = aluno.Element("Responsavel")?.Element("Telefone")?.Value
             };
         }
     }
 
     public ResultadoAutenticacao Autenticar(TipoAcesso tipo, string usuario, string senha)
     {
-        usuario = usuario.Trim();
-        senha = senha.Trim();
+        try
+        {
+            usuario = usuario.Trim();
+            senha = senha.Trim();
 
-        if (string.IsNullOrEmpty(usuario) || string.IsNullOrEmpty(senha))
-            return Falha("Usuário e senha são obrigatórios.");
+            if (string.IsNullOrEmpty(usuario) || string.IsNullOrEmpty(senha))
+                return Falha("Usuário e senha são obrigatórios.");
 
-        XElement? elemento = tipo switch
+            if (_documento.Root == null)
+                return Falha("Arquivo de usuários não foi carregado corretamente.");
+
+            XElement? elemento = tipo switch
         {
             TipoAcesso.Diretor => _documento.Root?
                 .Element("Diretor")?
@@ -120,60 +152,130 @@ public class ServicoAutenticacaoXml
             Turma = elemento.Element("Turma")?.Value
         };
 
-        return new ResultadoAutenticacao
+            return new ResultadoAutenticacao
+            {
+                Sucesso = true,
+                Mensagem = $"Login realizado com sucesso. Bem-vindo(a), {credencial.Nome}!",
+                Credencial = credencial
+            };
+        }
+        catch (Exception ex)
         {
-            Sucesso = true,
-            Mensagem = $"Login realizado com sucesso. Bem-vindo(a), {credencial.Nome}!",
-            Credencial = credencial
-        };
+            return Falha($"Erro ao autenticar: {ex.Message}");
+        }
     }
 
     public void SalvarNovoProfessor(string nome, string cpf, string disciplina, string usuario, string senha)
     {
-        var raiz = ObterOuCriarRaiz();
-        var container = raiz.Element("Professores") ?? new XElement("Professores");
-        if (container.Parent == null)
-            raiz.Add(container);
-
-        if (container.Elements("Professor").Any(p => LoginIgual(p, usuario)))
+        try
         {
-            Console.WriteLine("Usuário de login já existe no XML.");
-            return;
+            if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(senha))
+            {
+                Console.WriteLine("Usuário e senha de login são obrigatórios.");
+                return;
+            }
+
+            if (!ValidadorCpf.TentarNormalizar(cpf, out string cpfNormalizado, out string erroCpf))
+            {
+                Console.WriteLine(erroCpf);
+                return;
+            }
+
+            if (CpfExisteNoXml(cpfNormalizado))
+            {
+                Console.WriteLine("CPF já cadastrado no sistema.");
+                return;
+            }
+
+            var raiz = ObterOuCriarRaiz();
+            var container = raiz.Element("Professores") ?? new XElement("Professores");
+            if (container.Parent == null)
+                raiz.Add(container);
+
+            if (container.Elements("Professor").Any(p => LoginIgual(p, usuario)))
+            {
+                Console.WriteLine("Usuário de login já existe no XML.");
+                return;
+            }
+
+            container.Add(new XElement("Professor",
+                new XAttribute("login", usuario),
+                new XAttribute("senha", senha),
+                new XElement("Nome", nome),
+                new XElement("Cpf", cpfNormalizado),
+                new XElement("Disciplina", disciplina)));
+
+            if (!TentarPersistir(out string erro))
+            {
+                Console.WriteLine(erro);
+                return;
+            }
+
+            Console.WriteLine("Credenciais do professor salvas em usuarios.xml.");
         }
-
-        container.Add(new XElement("Professor",
-            new XAttribute("login", usuario),
-            new XAttribute("senha", senha),
-            new XElement("Nome", nome),
-            new XElement("Cpf", cpf),
-            new XElement("Disciplina", disciplina)));
-
-        Persistir();
-        Console.WriteLine("Credenciais do professor salvas em usuarios.xml.");
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao salvar professor: {ex.Message}");
+        }
     }
 
-    public void SalvarNovoAluno(string nome, string cpf, string turma, string usuario, string senha)
+    public void SalvarNovoAluno(string nome, string cpf, string turma, string matricula,
+        string responsavelNome, string responsavelTelefone, string usuario, string senha)
     {
-        var raiz = ObterOuCriarRaiz();
-        var container = raiz.Element("Alunos") ?? new XElement("Alunos");
-        if (container.Parent == null)
-            raiz.Add(container);
-
-        if (container.Elements("Aluno").Any(a => LoginIgual(a, usuario)))
+        try
         {
-            Console.WriteLine("Usuário de login já existe no XML.");
-            return;
+            if (string.IsNullOrWhiteSpace(usuario) || string.IsNullOrWhiteSpace(senha))
+            {
+                Console.WriteLine("Usuário e senha de login são obrigatórios.");
+                return;
+            }
+
+            if (!ValidadorCpf.TentarNormalizar(cpf, out string cpfNormalizado, out string erroCpf))
+            {
+                Console.WriteLine(erroCpf);
+                return;
+            }
+
+            if (CpfExisteNoXml(cpfNormalizado))
+            {
+                Console.WriteLine("CPF já cadastrado no sistema.");
+                return;
+            }
+
+            var raiz = ObterOuCriarRaiz();
+            var container = raiz.Element("Alunos") ?? new XElement("Alunos");
+            if (container.Parent == null)
+                raiz.Add(container);
+
+            if (container.Elements("Aluno").Any(a => LoginIgual(a, usuario)))
+            {
+                Console.WriteLine("Usuário de login já existe no XML.");
+                return;
+            }
+
+            container.Add(new XElement("Aluno",
+                new XAttribute("login", usuario),
+                new XAttribute("senha", senha),
+                new XElement("Nome", nome),
+                new XElement("Cpf", cpfNormalizado),
+                new XElement("Matricula", matricula.Trim()),
+                new XElement("Turma", turma),
+                new XElement("Responsavel",
+                    new XElement("Nome", responsavelNome),
+                    new XElement("Telefone", responsavelTelefone))));
+
+            if (!TentarPersistir(out string erro))
+            {
+                Console.WriteLine(erro);
+                return;
+            }
+
+            Console.WriteLine("Credenciais do aluno salvas em usuarios.xml.");
         }
-
-        container.Add(new XElement("Aluno",
-            new XAttribute("login", usuario),
-            new XAttribute("senha", senha),
-            new XElement("Nome", nome),
-            new XElement("Cpf", cpf),
-            new XElement("Turma", turma)));
-
-        Persistir();
-        Console.WriteLine("Credenciais do aluno salvas em usuarios.xml.");
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao salvar aluno: {ex.Message}");
+        }
     }
 
     private XElement ObterOuCriarRaiz()
@@ -189,8 +291,76 @@ public class ServicoAutenticacaoXml
 
     private void Persistir()
     {
-        _documento.Save(_caminhoArquivo);
-        Carregar();
+        if (!TentarPersistir(out string erro))
+            throw new InvalidOperationException(erro);
+    }
+
+    private bool TentarPersistir(out string mensagemErro)
+    {
+        mensagemErro = "";
+
+        try
+        {
+            if (string.IsNullOrEmpty(_caminhoArquivo))
+            {
+                mensagemErro = "Caminho do arquivo de usuários não definido.";
+                return false;
+            }
+
+            _documento.Save(_caminhoArquivo);
+            SincronizarCopiaBin();
+
+            return TentarCarregar(out mensagemErro);
+        }
+        catch (IOException ex)
+        {
+            mensagemErro = $"Erro ao salvar {NomeArquivo}: {ex.Message}";
+            return false;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            mensagemErro = $"Sem permissão para salvar {NomeArquivo}: {ex.Message}";
+            return false;
+        }
+        catch (System.Xml.XmlException ex)
+        {
+            mensagemErro = $"Erro ao gravar XML: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static string ResolverCaminhoArquivo()
+    {
+        string caminhoProjeto = Path.Combine(Directory.GetCurrentDirectory(), NomeArquivo);
+        string caminhoBin = Path.Combine(AppContext.BaseDirectory, NomeArquivo);
+
+        if (File.Exists(caminhoProjeto))
+            return caminhoProjeto;
+
+        if (File.Exists(caminhoBin))
+            return caminhoBin;
+
+        return caminhoProjeto;
+    }
+
+    private void SincronizarCopiaBin()
+    {
+        string caminhoBin = Path.Combine(AppContext.BaseDirectory, NomeArquivo);
+        if (string.Equals(_caminhoArquivo, caminhoBin, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (!File.Exists(_caminhoArquivo))
+            return;
+
+        try
+        {
+            Directory.CreateDirectory(AppContext.BaseDirectory);
+            File.Copy(_caminhoArquivo, caminhoBin, overwrite: true);
+        }
+        catch (IOException ex)
+        {
+            Console.WriteLine($"Aviso: não foi possível sincronizar cópia em bin: {ex.Message}");
+        }
     }
 
     private static bool LoginIgual(XElement elemento, string usuario) =>
@@ -198,6 +368,31 @@ public class ServicoAutenticacaoXml
 
     private static bool SenhaIgual(XElement elemento, string senha) =>
         (string?)elemento.Attribute("senha") == senha;
+
+    private bool CpfExisteNoXml(string cpf)
+    {
+        var raiz = _documento.Root;
+        if (raiz == null)
+            return false;
+
+        var cpfDiretor = raiz.Element("Diretor")?.Element("Usuario")?.Element("Cpf")?.Value;
+        if (cpfDiretor == cpf)
+            return true;
+
+        foreach (var prof in raiz.Element("Professores")?.Elements("Professor") ?? Enumerable.Empty<XElement>())
+        {
+            if (prof.Element("Cpf")?.Value == cpf)
+                return true;
+        }
+
+        foreach (var aluno in raiz.Element("Alunos")?.Elements("Aluno") ?? Enumerable.Empty<XElement>())
+        {
+            if (aluno.Element("Cpf")?.Value == cpf)
+                return true;
+        }
+
+        return false;
+    }
 
     private static ResultadoAutenticacao Falha(string mensagem) =>
         new() { Sucesso = false, Mensagem = mensagem };

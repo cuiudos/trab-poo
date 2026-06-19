@@ -2,6 +2,7 @@ const { parseBody } = require("../_lib/body");
 const { normalizarEmail } = require("../_lib/email");
 const { normalizarDisciplinas } = require("../_lib/disciplinas");
 const { verificarDiretor } = require("../_lib/auth-diretor");
+const { validarCpf } = require("../_lib/validar-cpf");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -10,7 +11,7 @@ module.exports = async (req, res) => {
   if (!auth.ok) return res.status(auth.status).json({ ok: false, mensagem: auth.mensagem });
 
   const body = await parseBody(req);
-  const { email, password, nome, cpf, role, disciplina, turmaNome } = body;
+  const { email, password, nome, cpf, role, disciplina, turmaNome, matricula, responsavelNome, responsavelTelefone } = body;
   const emailNormalizado = normalizarEmail(email);
 
   if (!email || !password || !nome || !role) {
@@ -19,6 +20,43 @@ module.exports = async (req, res) => {
 
   if (password.length < 8) {
     return res.status(400).json({ ok: false, mensagem: "Senha deve ter no mínimo 8 caracteres." });
+  }
+
+  let cpfNormalizado = null;
+  if (cpf) {
+    const validacaoCpf = validarCpf(cpf);
+    if (!validacaoCpf.ok) {
+      return res.status(400).json({ ok: false, mensagem: validacaoCpf.mensagem });
+    }
+    cpfNormalizado = validacaoCpf.cpf;
+
+    const { data: cpfExistente } = await auth.admin
+      .from("perfis")
+      .select("id")
+      .eq("escola_id", auth.escolaId)
+      .eq("cpf", cpfNormalizado)
+      .maybeSingle();
+
+    if (cpfExistente) {
+      return res.status(400).json({ ok: false, mensagem: "CPF já cadastrado no sistema." });
+    }
+  }
+
+  if (role === "aluno" && !matricula?.trim()) {
+    return res.status(400).json({ ok: false, mensagem: "Matrícula é obrigatória para alunos." });
+  }
+
+  if (role === "aluno" && matricula?.trim()) {
+    const { data: matriculaExistente } = await auth.admin
+      .from("registros_alunos")
+      .select("id, perfil:perfis!inner(escola_id)")
+      .eq("matricula", matricula.trim())
+      .eq("perfil.escola_id", auth.escolaId)
+      .maybeSingle();
+
+    if (matriculaExistente) {
+      return res.status(400).json({ ok: false, mensagem: "Matrícula já cadastrada no sistema." });
+    }
   }
 
   const { data: novoAuth, error: createErr } = await auth.admin.auth.admin.createUser({
@@ -37,7 +75,7 @@ module.exports = async (req, res) => {
     id: userId,
     escola_id: auth.escolaId,
     nome: nome.trim(),
-    cpf: cpf || null,
+    cpf: cpfNormalizado,
     role,
     disciplina: role === "professor" ? normalizarDisciplinas(disciplina) : null,
   });
@@ -62,6 +100,9 @@ module.exports = async (req, res) => {
     await auth.admin.from("registros_alunos").insert({
       perfil_id: userId,
       turma_id: turma.id,
+      matricula: matricula?.trim() || null,
+      responsavel_nome: responsavelNome?.trim() || null,
+      responsavel_telefone: responsavelTelefone?.trim() || null,
     });
   }
 

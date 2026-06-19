@@ -2,12 +2,14 @@ namespace Sistema_Gerenciamento_Escolar.Models;
 
 public class Professor : DadosPessoais
 {
-    public string Disciplina { get; set; }
+    public Disciplina Disciplina { get; set; }
     public Turma Turma { get; set; }
+    public Usuario? UsuarioLogin { get; set; }
 
     public Professor(string nome, string cpf, string disciplina) : base(nome, cpf)
     {
-        Disciplina = disciplina;
+        Disciplina = new Disciplina(disciplina);
+        Turma = null!;
     }
 
     public void LancarNota(string nomeAluno, double nota)
@@ -17,12 +19,13 @@ public class Professor : DadosPessoais
             Console.WriteLine("Professor não possui turma!");
             return;
         }
+
         foreach (Aluno aluno in Turma.Alunos)
         {
             if (aluno.GetNome() == nomeAluno)
             {
-                aluno.Nota = nota;
-                Console.WriteLine("Nota lançada!");
+                aluno.Boletim.LancarNota(Disciplina.Nome, nota);
+                Console.WriteLine($"Nota lançada em {Disciplina.Nome}!");
                 return;
             }
         }
@@ -42,8 +45,8 @@ public class Professor : DadosPessoais
         {
             if (aluno.GetNome() == nomeAluno)
             {
-                aluno.Faltas++;
-                Console.WriteLine("Falta registrada!");
+                aluno.Boletim.RegistrarFalta(Disciplina.Nome);
+                Console.WriteLine($"Falta registrada em {Disciplina.Nome}!");
                 return;
             }
         }
@@ -60,7 +63,7 @@ public class Professor : DadosPessoais
         }
 
         Console.WriteLine($"\n--- Turma: {Turma.Nome} ---");
-        Console.WriteLine($"Disciplina: {Disciplina}");
+        Console.WriteLine($"Disciplina: {Disciplina.Nome}");
         Console.WriteLine($"Professor: {GetNome()}");
 
         if (Turma.Alunos.Count == 0)
@@ -72,7 +75,10 @@ public class Professor : DadosPessoais
         Console.WriteLine("\nAlunos:");
         foreach (Aluno aluno in Turma.Alunos)
         {
-            Console.WriteLine($"  • {aluno.GetNome()} | CPF: {aluno.GetCPF()} | Nota: {aluno.Nota} | Faltas: {aluno.Faltas}");
+            var registro = aluno.Boletim.ObterRegistro(Disciplina.Nome);
+            double nota = registro?.Nota.Valor ?? 0;
+            int faltas = registro?.Falta.Quantidade ?? 0;
+            Console.WriteLine($"  • {aluno.GetNome()} | Matrícula: {aluno.Matricula} | Nota: {nota} | Faltas: {faltas}");
         }
     }
 }
