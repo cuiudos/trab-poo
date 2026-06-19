@@ -21,6 +21,46 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
+function extrairDigitosCpf(entrada) {
+  if (entrada == null || String(entrada).trim() === "") return "";
+  let texto = String(entrada).trim();
+  if (/e/i.test(texto)) {
+    const n = Number(texto);
+    if (Number.isFinite(n) && n > 0) {
+      texto = n.toLocaleString("fullwide", { useGrouping: false, maximumFractionDigits: 0 });
+    }
+  }
+  return texto.replace(/\D/g, "");
+}
+
+function formatarCpfExibicao(entrada) {
+  const cpf = extrairDigitosCpf(entrada);
+  if (!cpf) return "—";
+  if (cpf.length !== 11) return "CPF inválido";
+  return `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}`;
+}
+
+function cpfParaCampo(entrada) {
+  const cpf = extrairDigitosCpf(entrada);
+  return cpf.length === 11 ? cpf : "";
+}
+
+function aplicarMascaraCpf(input) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const pos = input.selectionStart;
+    const antes = input.value.length;
+    input.value = extrairDigitosCpf(input.value).slice(0, 11);
+    const depois = input.value.length;
+    const novaPos = Math.max(0, (pos ?? depois) - (antes - depois));
+    input.setSelectionRange(novaPos, novaPos);
+  });
+}
+
+function configurarCamposCpf() {
+  ["#dir-al-cpf", "#dir-pr-cpf", "#edit-cpf"].forEach((sel) => aplicarMascaraCpf($(sel)));
+}
+
 function authHeader() {
   const token = sessaoAtual?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -660,7 +700,7 @@ function renderTurmas(container, turmas, comSelect = false, modoDiretor = false)
       const rows = (t.alunos || [])
         .map(
           (a) =>
-            `<tr><td>${escapeHtml(a.nome)}</td><td>${escapeHtml(a.cpf || "")}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td class="col-total">${formatTotalHtml(a.notasDisciplinas)}</td><td class="col-freq">${formatFrequenciaHtml(a.faltasDisciplinas, aulas)}</td><td>${formatSituacaoHtml(a.notasDisciplinas, a.faltasDisciplinas, aulas)}</td></tr>`
+            `<tr><td>${escapeHtml(a.nome)}</td><td class="cel-cpf">${escapeHtml(formatarCpfExibicao(a.cpf))}</td><td class="col-notas">${formatNotasHtml(a.notasDisciplinas)}</td><td class="col-total">${formatTotalHtml(a.notasDisciplinas)}</td><td class="col-freq">${formatFrequenciaHtml(a.faltasDisciplinas, aulas)}</td><td>${formatSituacaoHtml(a.notasDisciplinas, a.faltasDisciplinas, aulas)}</td></tr>`
         )
         .join("");
 
@@ -933,7 +973,7 @@ function renderUsuarios(container, usuarios) {
       <tr data-user-id="${u.id}">
         <td><code class="login-cell">${escapeHtml(u.login || "—")}</code></td>
         <td>${escapeHtml(u.nome)}</td>
-        <td>${escapeHtml(u.cpf || "—")}</td>
+        <td class="cel-cpf">${u.cpfInvalido ? `<span class="cpf-invalido" title="Edite o usuário e informe 11 números">${escapeHtml(u.cpfExibicao || formatarCpfExibicao(u.cpf))}</span>` : escapeHtml(u.cpfExibicao || formatarCpfExibicao(u.cpf))}</td>
         <td><span class="badge-role badge-role-${escapeHtml(u.role)}">${escapeHtml(labelPerfil(u.role))}</span></td>
         <td>${u.role === "professor" ? renderDisciplinasHtml(u.disciplina) : "—"}</td>
         <td>${escapeHtml(infoExtraUsuario(u))}</td>
@@ -958,7 +998,10 @@ function abrirModalEditar(usuario) {
   $("#edit-user-id").value = usuario.id;
   $("#edit-user-role").value = usuario.role;
   $("#edit-nome").value = usuario.nome || "";
-  $("#edit-cpf").value = usuario.cpf || "";
+  $("#edit-cpf").value = cpfParaCampo(usuario.cpf);
+  if (usuario.cpfInvalido || (usuario.cpf && extrairDigitosCpf(usuario.cpf).length !== 11)) {
+    setTimeout(() => toast("CPF inválido — informe os 11 números e salve."), 0);
+  }
   $("#edit-matricula").value = usuario.matricula || "";
   $("#edit-responsavel").value = usuario.responsavelNome || "";
   $("#edit-responsavel-tel").value = usuario.responsavelTelefone || "";
@@ -1601,7 +1644,7 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
           <div><dt>Nome</dt><dd>${escapeHtml(perfil?.nome)}</dd></div>
           <div><dt>Usuário</dt><dd>${escapeHtml(loginAluno)}</dd></div>
           <div><dt>Matrícula</dt><dd>${escapeHtml(reg.matricula || "—")}</dd></div>
-          <div><dt>CPF</dt><dd>${escapeHtml(perfil?.cpf || "—")}</dd></div>
+          <div><dt>CPF</dt><dd class="cel-cpf">${escapeHtml(formatarCpfExibicao(perfil?.cpf))}</dd></div>
           <div><dt>Turma</dt><dd>${escapeHtml(reg.turma?.nome || "—")}</dd></div>
           <div><dt>Responsável</dt><dd>${escapeHtml(reg.responsavel_nome || "—")}${reg.responsavel_telefone ? ` (${escapeHtml(reg.responsavel_telefone)})` : ""}</dd></div>
         </dl>
@@ -1632,7 +1675,10 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
 }
 
 initSupabase()
-  .then(verificarSessao)
+  .then(() => {
+    configurarCamposCpf();
+    return verificarSessao();
+  })
   .catch((e) => {
     const erro = $("#login-erro");
     erro.textContent = e.message;

@@ -1,6 +1,7 @@
 const { verificarDiretor } = require("../_lib/auth-diretor");
 const { emailParaLogin } = require("../_lib/email");
 const { listaDisciplinas } = require("../_lib/disciplinas");
+const { extrairDigitosCpf, formatarCpfExibicao } = require("../_lib/validar-cpf");
 
 function extrairTurmaAluno(registros) {
   const reg = Array.isArray(registros) ? registros[0] : registros;
@@ -48,12 +49,16 @@ module.exports = async (req, res) => {
 
     const registroAluno = extrairTurmaAluno(p.registros_alunos);
 
+    const digitosCpf = extrairDigitosCpf(p.cpf);
+
     return {
       id: p.id,
       nome: p.nome,
       login: emailParaLogin(email),
       email,
-      cpf: p.cpf,
+      cpf: digitosCpf.length === 11 ? digitosCpf : p.cpf,
+      cpfExibicao: formatarCpfExibicao(p.cpf),
+      cpfInvalido: Boolean(p.cpf) && digitosCpf.length !== 11,
       role: p.role,
       disciplina: p.disciplina,
       disciplinas,

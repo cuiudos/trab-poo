@@ -1272,6 +1272,281 @@ body {
     flex-direction: row;
     flex-wrap: wrap;
   }
+
+  .prof-tab-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-top: none;
+    padding-top: 0;
+    gap: 0.5rem;
+  }
+
+  .app-main {
+    padding: 1.25rem 1rem;
+  }
+
+  .grid-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .aluno-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .aluno-disciplinas-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* —— Celular —— */
+@media (max-width: 640px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    overflow-x: clip;
+  }
+
+  .login-hero {
+    padding: 1.75rem 1.25rem 1.5rem;
+  }
+
+  .login-hero h1 {
+    font-size: 2.1rem;
+  }
+
+  .login-hero p {
+    font-size: 0.95rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .hero-features {
+    font-size: 0.85rem;
+  }
+
+  .floating-flowers {
+    display: none;
+  }
+
+  .login-panel {
+    padding: 1rem 1rem 2rem;
+    align-items: flex-start;
+  }
+
+  .login-card {
+    padding: 1.5rem 1.15rem;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(45, 41, 38, 0.1);
+  }
+
+  .login-card h2 {
+    font-size: 1.65rem;
+  }
+
+  .role-tab {
+    font-size: 0.72rem;
+    padding: 0.5rem 0.35rem;
+  }
+
+  #form-login input,
+  .btn-primary {
+    font-size: 16px;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .brand {
+    flex: 1 1 auto;
+    font-size: 0.95rem;
+    min-width: 0;
+  }
+
+  .user-info {
+    flex: 1 1 100%;
+    order: 3;
+    font-size: 0.82rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  #user-nome {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  #btn-sair {
+    margin-left: auto;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.85rem;
+  }
+
+  .app-main {
+    padding: 1rem 0.75rem 1.5rem;
+  }
+
+  .painel h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .card-head .btn-ghost,
+  .card-head .btn-sm {
+    align-self: flex-start;
+  }
+
+  .card .btn-primary.btn-sm {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .turma-bloco .turma-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acoes-linha {
+    width: 100%;
+  }
+
+  .acoes-linha .btn-editar,
+  .acoes-linha .btn-danger {
+    flex: 1;
+    min-height: 2.5rem;
+    text-align: center;
+  }
+
+  .lista-usuarios,
+  .gradebook-scroll {
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -0.25rem;
+    padding: 0 0.25rem;
+  }
+
+  .tabela-alunos {
+    font-size: 0.78rem;
+  }
+
+  .tabela-alunos th,
+  .tabela-alunos td {
+    padding: 0.45rem 0.4rem;
+  }
+
+  .tabela-usuarios .col-acoes {
+    white-space: normal;
+  }
+
+  .tabela-usuarios .acoes-linha {
+    flex-direction: column;
+  }
+
+  .dash-value {
+    font-size: 1.75rem;
+  }
+
+  .dash-panel-wide {
+    padding: 1.25rem 1rem;
+  }
+
+  .dash-stat {
+    padding: 1.15rem 1rem;
+  }
+
+  .aluno-disc-card {
+    padding: 1.15rem 1rem;
+  }
+
+  .disc-bloco {
+    padding: 1rem;
+  }
+
+  .gradebook-nova-atv {
+    flex-direction: column;
+  }
+
+  .gradebook-nova-atv input[type="text"],
+  .gradebook-nova-atv input[type="number"] {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+  }
+
+  .gradebook-nova-atv .btn-primary {
+    width: 100%;
+  }
+
+  .grade-input {
+    width: 3.5rem;
+    min-height: 2.25rem;
+    font-size: 16px;
+  }
+
+  .acoes-faltas-dir {
+    flex-direction: column;
+  }
+
+  .acoes-faltas-dir .btn-primary,
+  .acoes-faltas-dir .btn-ghost {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .prof-disc-btn,
+  .prof-tab {
+    min-height: 2.5rem;
+  }
+
+  .modal-overlay {
+    padding: 0.75rem;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-height: min(92vh, 100%);
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .modal-acoes {
+    flex-direction: column-reverse;
+  }
+
+  .modal-acoes .btn-primary,
+  .modal-acoes .btn-ghost {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .toast {
+    left: 1rem;
+    right: 1rem;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+
+  .btn-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
 }
 
 .toast {
