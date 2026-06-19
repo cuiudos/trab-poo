@@ -98,12 +98,13 @@
             <h3>Novo aluno</h3>
             <input type="text" id="dir-al-nome" placeholder="Nome completo" />
             <input type="text" id="dir-al-cpf" placeholder="CPF (11 números)" maxlength="14" inputmode="numeric" />
-            <input type="text" id="dir-al-matricula" placeholder="Matrícula" />
+            <p class="meta card-hint">A matrícula de 6 dígitos é gerada automaticamente.</p>
             <input type="text" id="dir-al-responsavel" placeholder="Nome do responsável" />
             <input type="text" id="dir-al-responsavel-tel" placeholder="Telefone do responsável" />
             <input type="text" id="dir-al-turma" placeholder="Turma (ex: 3º Ano A)" />
             <input type="text" id="dir-al-email" placeholder="Login ou e-mail do aluno" />
-            <input type="password" id="dir-al-pass" placeholder="Senha (mín. 8)" minlength="8" />
+            <input type="password" id="dir-al-pass" placeholder="Senha (mín. 8)" minlength="8" autocomplete="new-password" />
+            <input type="password" id="dir-al-pass-confirm" placeholder="Confirme a senha" minlength="8" autocomplete="new-password" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-aluno">Cadastrar</button>
           </article>
           <article class="card">
@@ -112,7 +113,8 @@
             <input type="text" id="dir-pr-cpf" placeholder="CPF (11 números)" maxlength="14" inputmode="numeric" />
             <input type="text" id="dir-pr-disc" placeholder="Disciplinas (ex: Matemática, Física)" />
             <input type="text" id="dir-pr-email" placeholder="Login ou e-mail do professor" />
-            <input type="password" id="dir-pr-pass" placeholder="Senha (mín. 8)" minlength="8" />
+            <input type="password" id="dir-pr-pass" placeholder="Senha (mín. 8)" minlength="8" autocomplete="new-password" />
+            <input type="password" id="dir-pr-pass-confirm" placeholder="Confirme a senha" minlength="8" autocomplete="new-password" />
             <button type="button" class="btn-primary btn-sm" data-acao="cad-prof">Cadastrar</button>
           </article>
           <article class="card">
@@ -228,7 +230,11 @@
         </label>
         <label>
           <span>Nova senha (opcional)</span>
-          <input type="password" id="edit-senha" placeholder="Deixe em branco para manter" minlength="8" />
+          <input type="password" id="edit-senha" placeholder="Deixe em branco para manter" minlength="8" autocomplete="new-password" />
+        </label>
+        <label id="edit-campo-senha-confirm" hidden>
+          <span>Confirmar nova senha</span>
+          <input type="password" id="edit-senha-confirm" placeholder="Repita a senha" minlength="8" autocomplete="new-password" />
         </label>
         <div class="modal-acoes">
           <button type="button" class="btn-ghost" data-acao="fechar-modal">Cancelar</button>
@@ -279,6 +285,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/js/app.js?v=22"></script>
+  <script src="/js/app.js?v=23"></script>
 </body>
 </html>

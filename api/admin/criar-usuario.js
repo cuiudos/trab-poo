@@ -3,6 +3,7 @@ const { normalizarEmail } = require("../_lib/email");
 const { normalizarDisciplinas } = require("../_lib/disciplinas");
 const { verificarDiretor } = require("../_lib/auth-diretor");
 const { validarCpf } = require("../_lib/validar-cpf");
+const { gerarMatriculaUnica } = require("../_lib/gerar-matricula");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false });
@@ -11,7 +12,18 @@ module.exports = async (req, res) => {
   if (!auth.ok) return res.status(auth.status).json({ ok: false, mensagem: auth.mensagem });
 
   const body = await parseBody(req);
-  const { email, password, nome, cpf, role, disciplina, turmaNome, matricula, responsavelNome, responsavelTelefone } = body;
+  const {
+    email,
+    password,
+    passwordConfirm,
+    nome,
+    cpf,
+    role,
+    disciplina,
+    turmaNome,
+    responsavelNome,
+    responsavelTelefone,
+  } = body;
   const emailNormalizado = normalizarEmail(email);
 
   if (!email || !password || !nome || !role) {
@@ -20,6 +32,10 @@ module.exports = async (req, res) => {
 
   if (password.length < 8) {
     return res.status(400).json({ ok: false, mensagem: "Senha deve ter no mínimo 8 caracteres." });
+  }
+
+  if (!passwordConfirm || password !== passwordConfirm) {
+    return res.status(400).json({ ok: false, mensagem: "As senhas não coincidem." });
   }
 
   let cpfNormalizado = null;
@@ -42,22 +58,7 @@ module.exports = async (req, res) => {
     }
   }
 
-  if (role === "aluno" && !matricula?.trim()) {
-    return res.status(400).json({ ok: false, mensagem: "Matrícula é obrigatória para alunos." });
-  }
-
-  if (role === "aluno" && matricula?.trim()) {
-    const { data: matriculaExistente } = await auth.admin
-      .from("registros_alunos")
-      .select("id, perfil:perfis!inner(escola_id)")
-      .eq("matricula", matricula.trim())
-      .eq("perfil.escola_id", auth.escolaId)
-      .maybeSingle();
-
-    if (matriculaExistente) {
-      return res.status(400).json({ ok: false, mensagem: "Matrícula já cadastrada no sistema." });
-    }
-  }
+  let matriculaAluno = null;
 
   const { data: novoAuth, error: createErr } = await auth.admin.auth.admin.createUser({
     email: emailNormalizado,
@@ -97,14 +98,27 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, mensagem: "Turma não encontrada." });
     }
 
+    try {
+      matriculaAluno = await gerarMatriculaUnica(auth.admin, auth.escolaId);
+    } catch (err) {
+      await auth.admin.auth.admin.deleteUser(userId);
+      await auth.admin.from("perfis").delete().eq("id", userId);
+      return res.status(500).json({ ok: false, mensagem: err.message || "Erro ao gerar matrícula." });
+    }
+
     await auth.admin.from("registros_alunos").insert({
       perfil_id: userId,
       turma_id: turma.id,
-      matricula: matricula?.trim() || null,
+      matricula: matriculaAluno,
       responsavel_nome: responsavelNome?.trim() || null,
       responsavel_telefone: responsavelTelefone?.trim() || null,
     });
   }
 
-  res.json({ ok: true, mensagem: "Usuário criado com sucesso no Supabase Auth." });
+  const mensagem =
+    role === "aluno" && matriculaAluno
+      ? `Aluno criado com sucesso. Matrícula: ${matriculaAluno}`
+      : "Usuário criado com sucesso no Supabase Auth.";
+
+  res.json({ ok: true, mensagem, matricula: matriculaAluno });
 };

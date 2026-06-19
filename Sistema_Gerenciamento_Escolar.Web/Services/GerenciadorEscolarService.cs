@@ -81,9 +81,14 @@ public class GerenciadorEscolarService
         if (Diretor.BuscarTurma(turma) == null)
             return (false, "Turma não encontrada.");
 
-        Diretor.CadastrarAluno(nome, cpf, turma);
+        var responsavel = new Responsavel("", "");
+        var usuarioLogin = string.IsNullOrWhiteSpace(usuario) ? null : new Usuario(usuario);
+
+        if (!Diretor.CadastrarAluno(nome, cpf, turma, null, responsavel, usuarioLogin, out var matriculaGerada))
+            return (false, "Não foi possível cadastrar o aluno.");
+
         if (!string.IsNullOrWhiteSpace(usuario) && !string.IsNullOrWhiteSpace(senha))
-            _autenticacao.SalvarNovoAluno(nome, cpf, turma, usuario, senha);
+            _autenticacao.SalvarNovoAluno(nome, cpf, turma, matriculaGerada, "", "", usuario, senha);
 
         Persistir();
         return (true, "Aluno cadastrado!");
@@ -185,7 +190,14 @@ public class GerenciadorEscolarService
         foreach (var alunoXml in _autenticacao.ObterAlunosXml())
         {
             if (!string.IsNullOrEmpty(alunoXml.Turma))
-                Diretor.CadastrarAluno(alunoXml.Nome, alunoXml.Cpf, alunoXml.Turma);
+            {
+                var responsavel = new Responsavel(
+                    alunoXml.ResponsavelNome ?? "",
+                    alunoXml.ResponsavelTelefone ?? "");
+                var usuario = string.IsNullOrWhiteSpace(alunoXml.Login) ? null : new Usuario(alunoXml.Login);
+                Diretor.CadastrarAluno(alunoXml.Nome, alunoXml.Cpf, alunoXml.Turma, alunoXml.Matricula,
+                    responsavel, usuario, out _);
+            }
         }
 
         Persistir();
@@ -216,11 +228,12 @@ public class GerenciadorEscolarService
                 var turmaRef = Diretor.BuscarTurma(t.Nome)!;
                 if (!turmaRef.Alunos.Any(x => x.GetNome() == a.Nome))
                 {
-                    Diretor.CadastrarAluno(a.Nome, a.Cpf, t.Nome);
-                    var aluno = turmaRef.Alunos.First(x => x.GetNome() == a.Nome);
-                    aluno.Nota = a.Nota;
-                    aluno.Faltas = a.Faltas;
+                    Diretor.CadastrarAluno(a.Nome, a.Cpf, t.Nome, null, new Responsavel("", ""), null, out _);
                 }
+
+                var aluno = turmaRef.Alunos.First(x => x.GetNome() == a.Nome);
+                aluno.Nota = a.Nota;
+                aluno.Faltas = a.Faltas;
             }
         }
     }

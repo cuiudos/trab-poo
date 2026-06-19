@@ -61,6 +61,29 @@ function configurarCamposCpf() {
   ["#dir-al-cpf", "#dir-pr-cpf", "#edit-cpf"].forEach((sel) => aplicarMascaraCpf($(sel)));
 }
 
+function validarSenhasCadastro(senha, confirmar) {
+  if (!senha || senha.length < 8) {
+    return { ok: false, mensagem: "Senha deve ter no mínimo 8 caracteres." };
+  }
+  if (senha !== confirmar) {
+    return { ok: false, mensagem: "As senhas não coincidem." };
+  }
+  return { ok: true };
+}
+
+function configurarConfirmacaoSenha() {
+  const senhaEdit = $("#edit-senha");
+  const campoConfirm = $("#edit-campo-senha-confirm");
+  const confirmEdit = $("#edit-senha-confirm");
+  if (!senhaEdit || !campoConfirm || !confirmEdit) return;
+
+  senhaEdit.addEventListener("input", () => {
+    const temSenha = senhaEdit.value.length > 0;
+    campoConfirm.hidden = !temSenha;
+    if (!temSenha) confirmEdit.value = "";
+  });
+}
+
 function authHeader() {
   const token = sessaoAtual?.access_token;
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -1006,6 +1029,8 @@ function abrirModalEditar(usuario) {
   $("#edit-responsavel").value = usuario.responsavelNome || "";
   $("#edit-responsavel-tel").value = usuario.responsavelTelefone || "";
   $("#edit-senha").value = "";
+  $("#edit-senha-confirm").value = "";
+  $("#edit-campo-senha-confirm").hidden = true;
   $("#edit-disciplinas").value = (usuario.disciplinas || listaDisciplinas(usuario.disciplina)).join(", ");
   $("#edit-turma").value = usuario.turmaAluno || "";
   $("#edit-campo-disciplinas").hidden = usuario.role !== "professor";
@@ -1019,6 +1044,9 @@ function abrirModalEditar(usuario) {
 
 function fecharModalEditar() {
   $("#modal-editar-usuario").hidden = true;
+  $("#edit-senha").value = "";
+  $("#edit-senha-confirm").value = "";
+  $("#edit-campo-senha-confirm").hidden = true;
 }
 
 async function carregarUsuariosDiretor() {
@@ -1112,7 +1140,12 @@ async function executarAcaoDiretor(acao, e) {
     if (role === "professor") body.disciplina = $("#edit-disciplinas").value;
     if (role === "aluno") body.turmaNome = $("#edit-turma").value;
     const senha = $("#edit-senha").value;
-    if (senha) body.password = senha;
+    if (senha) {
+      const senhaCheck = validarSenhasCadastro(senha, $("#edit-senha-confirm").value);
+      if (!senhaCheck.ok) throw new Error(senhaCheck.mensagem);
+      body.password = senha;
+      body.passwordConfirm = $("#edit-senha-confirm").value;
+    }
 
     btn.disabled = true;
     try {
@@ -1136,12 +1169,15 @@ async function executarAcaoDiretor(acao, e) {
     if (error) throw error;
     toast("Turma cadastrada!");
   } else if (acao === "cad-aluno") {
+    const senhaCheck = validarSenhasCadastro($("#dir-al-pass").value, $("#dir-al-pass-confirm").value);
+    if (!senhaCheck.ok) throw new Error(senhaCheck.mensagem);
+
     const r = await adminPost("/api/admin/criar-usuario", {
       email: $("#dir-al-email").value,
       password: $("#dir-al-pass").value,
+      passwordConfirm: $("#dir-al-pass-confirm").value,
       nome: $("#dir-al-nome").value,
       cpf: $("#dir-al-cpf").value,
-      matricula: $("#dir-al-matricula").value,
       responsavelNome: $("#dir-al-responsavel").value,
       responsavelTelefone: $("#dir-al-responsavel-tel").value,
       role: "aluno",
@@ -1149,11 +1185,17 @@ async function executarAcaoDiretor(acao, e) {
     });
     if (!r.ok) throw new Error(r.mensagem);
     invalidarCacheUsuarios();
-    toast(r.mensagem);
+    toast(r.mensagem || (r.matricula ? `Aluno cadastrado. Matrícula: ${r.matricula}` : "Aluno cadastrado."));
+    $("#dir-al-pass").value = "";
+    $("#dir-al-pass-confirm").value = "";
   } else if (acao === "cad-prof") {
+    const senhaCheck = validarSenhasCadastro($("#dir-pr-pass").value, $("#dir-pr-pass-confirm").value);
+    if (!senhaCheck.ok) throw new Error(senhaCheck.mensagem);
+
     const r = await adminPost("/api/admin/criar-usuario", {
       email: $("#dir-pr-email").value,
       password: $("#dir-pr-pass").value,
+      passwordConfirm: $("#dir-pr-pass-confirm").value,
       nome: $("#dir-pr-nome").value,
       cpf: $("#dir-pr-cpf").value,
       role: "professor",
@@ -1162,6 +1204,8 @@ async function executarAcaoDiretor(acao, e) {
     if (!r.ok) throw new Error(r.mensagem);
     invalidarCacheUsuarios();
     toast(r.mensagem);
+    $("#dir-pr-pass").value = "";
+    $("#dir-pr-pass-confirm").value = "";
   } else if (acao === "vincular") {
     const profId = await buscarIdPorEmail($("#dir-vinc-prof").value);
     if (!profId) throw new Error("Professor não encontrado.");
@@ -1677,6 +1721,7 @@ function renderDashboardAluno(perfil, reg, notas, faltasDisciplinas, aulasDiscip
 initSupabase()
   .then(() => {
     configurarCamposCpf();
+    configurarConfirmacaoSenha();
     return verificarSessao();
   })
   .catch((e) => {

@@ -21,9 +21,11 @@ public class Diretor : DadosPessoais
         Turmas.Add(turma);
     }
 
-    public bool CadastrarAluno(string nome, string CPF, string NomeTurma, string matricula,
-        Responsavel responsavel, Usuario? usuarioLogin)
+    public bool CadastrarAluno(string nome, string CPF, string NomeTurma, string? matricula,
+        Responsavel responsavel, Usuario? usuarioLogin, out string matriculaGerada)
     {
+        matriculaGerada = "";
+
         if (!ValidadorCpf.TentarNormalizar(CPF, out string cpf, out string erroCpf))
         {
             Console.WriteLine(erroCpf);
@@ -31,10 +33,11 @@ public class Diretor : DadosPessoais
         }
 
         if (string.IsNullOrWhiteSpace(matricula))
-        {
-            Console.WriteLine("Matrícula é obrigatória.");
-            return false;
-        }
+            matricula = GerarMatriculaAleatoria();
+        else
+            matricula = matricula.Trim();
+
+        matriculaGerada = matricula;
 
         if (MatriculaJaCadastrada(matricula))
         {
@@ -48,7 +51,7 @@ public class Diretor : DadosPessoais
             return false;
         }
 
-        Aluno aluno = new Aluno(nome, cpf, matricula.Trim(), responsavel, usuarioLogin);
+        Aluno aluno = new Aluno(nome, cpf, matricula, responsavel, usuarioLogin);
 
         foreach (Turma x in Turmas)
         {
@@ -331,5 +334,17 @@ public class Diretor : DadosPessoais
         }
 
         return false;
+    }
+
+    private string GerarMatriculaAleatoria()
+    {
+        for (int tentativa = 0; tentativa < 50; tentativa++)
+        {
+            string codigo = Random.Shared.Next(0, 1_000_000).ToString("D6");
+            if (!MatriculaJaCadastrada(codigo))
+                return codigo;
+        }
+
+        throw new InvalidOperationException("Não foi possível gerar matrícula única.");
     }
 }

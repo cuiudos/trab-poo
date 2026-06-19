@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
   if (!auth.ok) return res.status(auth.status).json({ ok: false, mensagem: auth.mensagem });
 
   const body = await parseBody(req);
-  const { id, nome, cpf, disciplina, turmaNome, password, matricula, responsavelNome, responsavelTelefone } = body;
+  const { id, nome, cpf, disciplina, turmaNome, password, passwordConfirm, matricula, responsavelNome, responsavelTelefone } = body;
 
   if (!id) return res.status(400).json({ ok: false, mensagem: "ID do usuário é obrigatório." });
   if (!nome?.trim()) return res.status(400).json({ ok: false, mensagem: "Nome é obrigatório." });
@@ -108,6 +108,9 @@ module.exports = async (req, res) => {
   if (password) {
     if (password.length < 8) {
       return res.status(400).json({ ok: false, mensagem: "Senha deve ter no mínimo 8 caracteres." });
+    }
+    if (!passwordConfirm || password !== passwordConfirm) {
+      return res.status(400).json({ ok: false, mensagem: "As senhas não coincidem." });
     }
     const { error: passErr } = await auth.admin.auth.admin.updateUserById(id, { password });
     if (passErr) return res.status(400).json({ ok: false, mensagem: passErr.message });

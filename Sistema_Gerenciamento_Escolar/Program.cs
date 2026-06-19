@@ -164,8 +164,6 @@ class Program
                         Console.Write("Nome do aluno: ");
                         nome = Console.ReadLine() ?? "";
                         cpf = LerCpf("CPF do aluno (11 números): ");
-                        Console.Write("Matrícula: ");
-                        string matricula = Console.ReadLine() ?? "";
                         Console.Write("Nome do responsável: ");
                         string responsavelNome = Console.ReadLine() ?? "";
                         Console.Write("Telefone do responsável: ");
@@ -174,21 +172,26 @@ class Program
                         turma = Console.ReadLine() ?? "";
                         Console.Write("Usuário de login: ");
                         string usuarioAluno = Console.ReadLine() ?? "";
-                        Console.Write("Senha de login: ");
-                        string senhaAluno = Console.ReadLine() ?? "";
+                        string? senhaAluno = LerSenhaComConfirmacao();
 
-                        if (string.IsNullOrWhiteSpace(usuarioAluno) || string.IsNullOrWhiteSpace(senhaAluno))
+                        if (senhaAluno == null)
+                            break;
+
+                        if (string.IsNullOrWhiteSpace(usuarioAluno))
                         {
-                            Console.WriteLine("Usuário e senha são obrigatórios para salvar no usuarios.xml.");
+                            Console.WriteLine("Usuário de login é obrigatório para salvar no usuarios.xml.");
                             break;
                         }
 
                         var responsavel = new Responsavel(responsavelNome, responsavelTelefone);
                         var usuario = new Usuario(usuarioAluno);
 
-                        if (diretor.CadastrarAluno(nome, cpf, turma, matricula, responsavel, usuario))
-                            autenticacao.SalvarNovoAluno(nome, cpf, turma, matricula, responsavelNome,
+                        if (diretor.CadastrarAluno(nome, cpf, turma, null, responsavel, usuario, out string matriculaGerada))
+                        {
+                            autenticacao.SalvarNovoAluno(nome, cpf, turma, matriculaGerada, responsavelNome,
                                 responsavelTelefone, usuarioAluno, senhaAluno);
+                            Console.WriteLine($"Matrícula gerada: {matriculaGerada}");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -206,12 +209,14 @@ class Program
                         string disciplina = Console.ReadLine() ?? "";
                         Console.Write("Usuário de login: ");
                         string usuarioProf = Console.ReadLine() ?? "";
-                        Console.Write("Senha de login: ");
-                        string senhaProf = Console.ReadLine() ?? "";
+                        string? senhaProf = LerSenhaComConfirmacao();
 
-                        if (string.IsNullOrWhiteSpace(usuarioProf) || string.IsNullOrWhiteSpace(senhaProf))
+                        if (senhaProf == null)
+                            break;
+
+                        if (string.IsNullOrWhiteSpace(usuarioProf))
                         {
-                            Console.WriteLine("Usuário e senha são obrigatórios para salvar no usuarios.xml.");
+                            Console.WriteLine("Usuário de login é obrigatório para salvar no usuarios.xml.");
                             break;
                         }
 
@@ -455,9 +460,10 @@ class Program
                         alunoXml.Nome,
                         alunoXml.Cpf,
                         alunoXml.Turma,
-                        alunoXml.Matricula ?? $"MAT-{alunoXml.Cpf[^4..]}",
+                        alunoXml.Matricula,
                         responsavel,
-                        usuario);
+                        usuario,
+                        out _);
                 }
             }
         }
@@ -465,6 +471,28 @@ class Program
         {
             Console.WriteLine($"Erro ao carregar dados iniciais: {ex.Message}");
         }
+    }
+
+    static string? LerSenhaComConfirmacao()
+    {
+        Console.Write("Senha de login (mín. 8 caracteres): ");
+        string senha = Console.ReadLine() ?? "";
+        Console.Write("Confirme a senha: ");
+        string confirmar = Console.ReadLine() ?? "";
+
+        if (senha != confirmar)
+        {
+            Console.WriteLine("As senhas não coincidem.");
+            return null;
+        }
+
+        if (senha.Length < 8)
+        {
+            Console.WriteLine("Senha deve ter no mínimo 8 caracteres.");
+            return null;
+        }
+
+        return senha;
     }
 
     static string LerCpf(string rotulo)
