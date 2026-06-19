@@ -254,6 +254,52 @@ public class Diretor : PessoaEscolar
         Console.WriteLine("Aluno não encontrado!");
     }
 
+    public bool ExcluirAluno(string nome, out string? loginRemovido)
+    {
+        loginRemovido = null;
+
+        foreach (Turma turma in Turmas)
+        {
+            Aluno? aluno = turma.Alunos.FirstOrDefault(a => a.GetNome() == nome);
+            if (aluno == null)
+                continue;
+
+            loginRemovido = aluno.UsuarioLogin?.Login;
+            turma.Alunos.Remove(aluno);
+            Console.WriteLine("Aluno excluído!");
+            return true;
+        }
+
+        Console.WriteLine("Aluno não encontrado!");
+        return false;
+    }
+
+    public bool ExcluirProfessor(string nome, out string? loginRemovido)
+    {
+        loginRemovido = null;
+        Professor? professor = BuscarProfessor(nome);
+        if (professor == null)
+        {
+            Console.WriteLine("Professor não encontrado!");
+            return false;
+        }
+
+        loginRemovido = professor.UsuarioLogin?.Login;
+
+        foreach (Turma turma in Turmas)
+        {
+            if (ReferenceEquals(turma.professor, professor))
+                turma.professor = null!;
+        }
+
+        if (professor.Turma != null)
+            professor.Turma = null!;
+
+        Professores.Remove(professor);
+        Console.WriteLine("Professor excluído!");
+        return true;
+    }
+
     public Professor? BuscarProfessor(string nome)
     {
         foreach (Professor professor in Professores)

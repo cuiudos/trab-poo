@@ -7,10 +7,19 @@ using Sistema_Gerenciamento_Escolar.Services;
 
 class Program
 {
+    static void LimparTela() => ConsoleTerminal.LimparTela();
+
+    static void Pausar(string mensagem = "Pressione Enter para continuar...")
+    {
+        Console.WriteLine($"\n{mensagem}");
+        Console.ReadLine();
+    }
+
     static void Main()
     {
         try
         {
+            ConsoleTerminal.Inicializar();
             var autenticacao = new ServicoAutenticacaoXml();
 
             if (!autenticacao.TentarCarregar(out string erroCarregar))
@@ -27,9 +36,7 @@ class Program
             }
 
             Diretor diretor = new Diretor(credencialDiretor.Nome, credencialDiretor.Cpf);
-            InicializarDadosExemplo(diretor, autenticacao);
-
-            Console.WriteLine($"\nInstituição: {diretor.Instituicao.Nome}");
+            InicializarDadosExemploSilencioso(diretor, autenticacao);
 
             int funcao;
 
@@ -37,7 +44,9 @@ class Program
             {
                 try
                 {
-                    Console.WriteLine("\n=== Sistema de Gerenciamento Escolar ===");
+                    LimparTela();
+                    Console.WriteLine("=== Sistema de Gerenciamento Escolar ===");
+                    Console.WriteLine($"Instituição: {diretor.Instituicao.Nome}\n");
                     Console.WriteLine("Qual seu perfil de acesso?");
                     Console.WriteLine("1 - Diretor");
                     Console.WriteLine("2 - Professor");
@@ -48,6 +57,7 @@ class Program
                     if (!int.TryParse(Console.ReadLine(), out funcao))
                     {
                         Console.WriteLine("Opção inválida.");
+                        Pausar();
                         continue;
                     }
 
@@ -63,16 +73,19 @@ class Program
                             MenuAluno(diretor, autenticacao);
                             break;
                         case 4:
+                            LimparTela();
                             Console.WriteLine("Encerrando o sistema...");
                             break;
                         default:
                             Console.WriteLine("Opção inválida.");
+                            Pausar();
                             break;
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Erro durante a operação: {ex.Message}");
+                    Pausar();
                     funcao = 0;
                 }
 
@@ -90,7 +103,8 @@ class Program
 
         try
         {
-            Console.WriteLine("\n--- Login (credenciais em usuarios.xml) ---");
+            LimparTela();
+            Console.WriteLine("--- Login (credenciais em usuarios.xml) ---");
             Console.Write("Usuário: ");
             string usuario = Console.ReadLine() ?? "";
             Console.Write("Senha: ");
@@ -101,15 +115,18 @@ class Program
             if (!resultado.Sucesso)
             {
                 Console.WriteLine(resultado.Mensagem);
+                Pausar();
                 return false;
             }
 
             Console.WriteLine(resultado.Mensagem);
+            Pausar();
             return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Erro no login: {ex.Message}");
+            Pausar();
             return false;
         }
     }
@@ -119,14 +136,17 @@ class Program
         if (!RealizarLogin(autenticacao, TipoAcesso.Diretor, out _))
             return;
 
+        LimparTela();
         IPerfilEscolar perfil = diretor;
         perfil.ExibirPainel();
+        Pausar();
 
         int opcao;
 
         do
         {
-            Console.WriteLine("\n--- Menu Diretor (acesso completo) ---");
+            LimparTela();
+            Console.WriteLine("--- Menu Diretor (acesso completo) ---");
             Console.WriteLine("1 - Cadastrar Turma");
             Console.WriteLine("2 - Cadastrar Aluno");
             Console.WriteLine("3 - Cadastrar Professor");
@@ -136,16 +156,23 @@ class Program
             Console.WriteLine("7 - Editar dados do aluno");
             Console.WriteLine("8 - Editar notas/faltas do aluno");
             Console.WriteLine("9 - Editar dados do professor");
-            Console.WriteLine("10 - Sair");
+            Console.WriteLine("10 - Excluir aluno");
+            Console.WriteLine("11 - Excluir professor");
+            Console.WriteLine("12 - Sair");
             Console.Write("\nOpção: ");
 
             if (!int.TryParse(Console.ReadLine(), out opcao))
             {
                 Console.WriteLine("Opção inválida.");
+                Pausar();
                 continue;
             }
 
             string nome, cpf, turma;
+            bool voltarAoMenu = true;
+
+            if (opcao != 12)
+                LimparTela();
 
             switch (opcao)
             {
@@ -301,6 +328,27 @@ class Program
                     break;
 
                 case 10:
+                    Console.Write("Nome do aluno a excluir: ");
+                    string alunoExcluir = Console.ReadLine() ?? "";
+                    if (diretor.ExcluirAluno(alunoExcluir, out string? loginAluno))
+                    {
+                        string chaveXml = loginAluno ?? alunoExcluir;
+                        autenticacao.RemoverAlunoDoXml(chaveXml);
+                    }
+                    break;
+
+                case 11:
+                    Console.Write("Nome do professor a excluir: ");
+                    string profExcluir = Console.ReadLine() ?? "";
+                    if (diretor.ExcluirProfessor(profExcluir, out string? loginProf))
+                    {
+                        string chaveXml = loginProf ?? profExcluir;
+                        autenticacao.RemoverProfessorDoXml(chaveXml);
+                    }
+                    break;
+
+                case 12:
+                    voltarAoMenu = false;
                     break;
 
                 default:
@@ -308,7 +356,10 @@ class Program
                     break;
             }
 
-        } while (opcao != 10);
+            if (voltarAoMenu && opcao != 12)
+                Pausar();
+
+        } while (opcao != 12);
     }
 
     static void MenuProfessor(Diretor diretor, ServicoAutenticacaoXml autenticacao)
@@ -329,24 +380,31 @@ class Program
 
         if (professorLogado == null)
         {
+            LimparTela();
             Console.WriteLine("Professor autenticado, mas ainda não cadastrado pelo diretor.");
+            Pausar();
             return;
         }
 
         if (professorLogado.Turma == null)
         {
+            LimparTela();
             Console.WriteLine("Você ainda não possui turma vinculada pelo diretor. Acesso negado.");
+            Pausar();
             return;
         }
 
+        LimparTela();
         IPerfilEscolar perfil = professorLogado;
         perfil.ExibirPainel();
+        Pausar();
 
         int opcao;
 
         do
         {
-            Console.WriteLine($"\n--- Menu Professor (turma: {professorLogado.Turma.Nome}) ---");
+            LimparTela();
+            Console.WriteLine($"--- Menu Professor (turma: {professorLogado.Turma.Nome}) ---");
             Console.WriteLine("1 - Lançar Nota");
             Console.WriteLine("2 - Lançar Falta");
             Console.WriteLine("3 - Visualizar minha turma");
@@ -356,8 +414,14 @@ class Program
             if (!int.TryParse(Console.ReadLine(), out opcao))
             {
                 Console.WriteLine("Opção inválida.");
+                Pausar();
                 continue;
             }
+
+            bool voltarAoMenu = true;
+
+            if (opcao != 4)
+                LimparTela();
 
             switch (opcao)
             {
@@ -382,12 +446,16 @@ class Program
                     break;
 
                 case 4:
+                    voltarAoMenu = false;
                     break;
 
                 default:
                     Console.WriteLine("Opção inválida.");
                     break;
             }
+
+            if (voltarAoMenu && opcao != 4)
+                Pausar();
 
         } while (opcao != 4);
     }
@@ -415,15 +483,31 @@ class Program
 
         if (alunoLogado == null)
         {
+            LimparTela();
             Console.WriteLine("Aluno autenticado no XML, mas ainda não cadastrado em uma turma pelo diretor.");
+            Pausar();
             return;
         }
 
+        LimparTela();
         IPerfilEscolar perfil = alunoLogado;
         perfil.ExibirPainel();
         alunoLogado.VisualizarBoletim(diretor.Instituicao.Nome);
-        Console.WriteLine("\nPressione Enter para voltar...");
-        Console.ReadLine();
+        Pausar();
+    }
+
+    static void InicializarDadosExemploSilencioso(Diretor diretor, ServicoAutenticacaoXml autenticacao)
+    {
+        var saidaAnterior = Console.Out;
+        Console.SetOut(TextWriter.Null);
+        try
+        {
+            InicializarDadosExemplo(diretor, autenticacao);
+        }
+        finally
+        {
+            Console.SetOut(saidaAnterior);
+        }
     }
 
     static void InicializarDadosExemplo(Diretor diretor, ServicoAutenticacaoXml autenticacao)

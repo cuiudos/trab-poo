@@ -1,5 +1,8 @@
 # Supabase — Colégio Jardim das Acácias
 
+> **Atenção:** o Supabase é usado **somente pela versão web** (`public/` + `api/` na Vercel).  
+> O console C# (`Sistema_Gerenciamento_Escolar/`) usa `usuarios.xml` e **não** se conecta ao Supabase.
+
 Login seguro com **Supabase Auth** (senha criptografada, JWT, sessão renovável). Dados em PostgreSQL com **Row Level Security (RLS)**.
 
 ## 1. Criar projeto Supabase

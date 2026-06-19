@@ -278,6 +278,72 @@ public class ServicoAutenticacaoXml
         }
     }
 
+    public bool RemoverAlunoDoXml(string nomeOuLogin)
+    {
+        try
+        {
+            var container = _documento.Root?.Element("Alunos");
+            if (container == null)
+                return false;
+
+            var aluno = container.Elements("Aluno").FirstOrDefault(a =>
+                LoginIgual(a, nomeOuLogin) ||
+                string.Equals(a.Element("Nome")?.Value, nomeOuLogin, StringComparison.OrdinalIgnoreCase));
+
+            if (aluno == null)
+                return false;
+
+            aluno.Remove();
+
+            if (!TentarPersistir(out string erro))
+            {
+                Console.WriteLine(erro);
+                return false;
+            }
+
+            Console.WriteLine("Aluno removido de usuarios.xml.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao remover aluno do XML: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool RemoverProfessorDoXml(string nomeOuLogin)
+    {
+        try
+        {
+            var container = _documento.Root?.Element("Professores");
+            if (container == null)
+                return false;
+
+            var professor = container.Elements("Professor").FirstOrDefault(p =>
+                LoginIgual(p, nomeOuLogin) ||
+                string.Equals(p.Element("Nome")?.Value, nomeOuLogin, StringComparison.OrdinalIgnoreCase));
+
+            if (professor == null)
+                return false;
+
+            professor.Remove();
+
+            if (!TentarPersistir(out string erro))
+            {
+                Console.WriteLine(erro);
+                return false;
+            }
+
+            Console.WriteLine("Professor removido de usuarios.xml.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao remover professor do XML: {ex.Message}");
+            return false;
+        }
+    }
+
     private XElement ObterOuCriarRaiz()
     {
         if (_documento.Root == null)
