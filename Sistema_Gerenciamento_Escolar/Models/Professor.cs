@@ -1,6 +1,6 @@
 namespace Sistema_Gerenciamento_Escolar.Models;
 
-public class Professor : DadosPessoais
+public class Professor : PessoaEscolar
 {
     public Disciplina Disciplina { get; set; }
     public Turma Turma { get; set; }
@@ -80,5 +80,18 @@ public class Professor : DadosPessoais
             int faltas = registro?.Falta.Quantidade ?? 0;
             Console.WriteLine($"  • {aluno.GetNome()} | Matrícula: {aluno.Matricula} | Nota: {nota} | Faltas: {faltas}");
         }
+    }
+
+    public override string ObterResumo() =>
+        $"{base.ObterResumo()} | Professor de {Disciplina.Nome}";
+
+    public override void ExibirPainel()
+    {
+        Console.WriteLine("\n=== Painel do Professor ===");
+        Console.WriteLine(ObterResumo());
+        if (Turma == null)
+            Console.WriteLine("Nenhuma turma vinculada.");
+        else
+            VisualizarTurma();
     }
 }

@@ -2,7 +2,7 @@ namespace Sistema_Gerenciamento_Escolar.Models;
 
 using Sistema_Gerenciamento_Escolar.Helpers;
 
-public class Diretor : DadosPessoais
+public class Diretor : PessoaEscolar
 {
     public Instituicao Instituicao { get; set; }
     public List<Turma> Turmas { get; set; }
@@ -15,7 +15,7 @@ public class Diretor : DadosPessoais
         Professores = new List<Professor>();
     }
 
-    public void CadastrarTurmma(string NomeTurma)
+    public void CadastrarTurma(string NomeTurma)
     {
         Turma turma = new Turma(NomeTurma);
         Turmas.Add(turma);
@@ -289,6 +289,17 @@ public class Diretor : DadosPessoais
         professor.SetCPF(cpf);
         professor.Disciplina = new Disciplina(novaDisciplina);
         Console.WriteLine("Professor atualizado!");
+    }
+
+    public override string ObterResumo() =>
+        $"{base.ObterResumo()} | Diretor | {Instituicao.Nome}";
+
+    public override void ExibirPainel()
+    {
+        Console.WriteLine("\n=== Painel do Diretor ===");
+        Console.WriteLine(ObterResumo());
+        Console.WriteLine($"Turmas cadastradas: {Turmas.Count}");
+        Console.WriteLine($"Professores cadastrados: {Professores.Count}");
     }
 
     private bool CpfJaCadastrado(string cpf, string? cpfIgnorar = null)

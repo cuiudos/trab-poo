@@ -1,6 +1,6 @@
 namespace Sistema_Gerenciamento_Escolar.Models;
 
-public class Aluno : DadosPessoais
+public class Aluno : PessoaEscolar
 {
     public string Matricula { get; set; } = "";
     public Usuario? UsuarioLogin { get; set; }
@@ -57,4 +57,15 @@ public class Aluno : DadosPessoais
 
     public void VisualizarBoletim(string nomeInstituicao) =>
         Boletim.Exibir(nomeInstituicao, GetNome(), Matricula);
+
+    public override string ObterResumo() =>
+        $"{base.ObterResumo()} | Matrícula {Matricula}";
+
+    public override void ExibirPainel()
+    {
+        Console.WriteLine("\n=== Painel do Aluno ===");
+        Console.WriteLine(ObterResumo());
+        Console.WriteLine($"Responsável: {Responsavel.Nome} ({Responsavel.Telefone})");
+        VisualizarNotaeFalta();
+    }
 }

@@ -10,5 +10,3 @@ node_modules/
 .env
 .env.local
 !.env.example
-**/dados_escola.json
-!data/dados_escola.json

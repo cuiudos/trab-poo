@@ -1,5 +1,6 @@
 ﻿using Sistema_Gerenciamento_Escolar.Enums;
 using Sistema_Gerenciamento_Escolar.Helpers;
+using Sistema_Gerenciamento_Escolar.Interfaces;
 using Sistema_Gerenciamento_Escolar.Models;
 using Sistema_Gerenciamento_Escolar.Results;
 using Sistema_Gerenciamento_Escolar.Services;
@@ -118,6 +119,9 @@ class Program
         if (!RealizarLogin(autenticacao, TipoAcesso.Diretor, out _))
             return;
 
+        IPerfilEscolar perfil = diretor;
+        perfil.ExibirPainel();
+
         int opcao;
 
         do
@@ -150,7 +154,7 @@ class Program
                     {
                         Console.Write("Nome da turma: ");
                         string nomeTurma = Console.ReadLine() ?? "";
-                        diretor.CadastrarTurmma(nomeTurma);
+                        diretor.CadastrarTurma(nomeTurma);
                     }
                     catch (Exception ex)
                     {
@@ -335,6 +339,9 @@ class Program
             return;
         }
 
+        IPerfilEscolar perfil = professorLogado;
+        perfil.ExibirPainel();
+
         int opcao;
 
         do
@@ -412,13 +419,8 @@ class Program
             return;
         }
 
-        Console.WriteLine("\n--- Suas informações (somente leitura) ---");
-        Console.WriteLine($"Instituição: {diretor.Instituicao.Nome}");
-        Console.WriteLine($"Nome: {alunoLogado.GetNome()}");
-        Console.WriteLine($"CPF: {alunoLogado.GetCPF()}");
-        Console.WriteLine($"Matrícula: {alunoLogado.Matricula}");
-        Console.WriteLine($"Usuário: {alunoLogado.UsuarioLogin?.Login ?? login!.Credencial!.Login}");
-        Console.WriteLine($"Responsável: {alunoLogado.Responsavel.Nome} ({alunoLogado.Responsavel.Telefone})");
+        IPerfilEscolar perfil = alunoLogado;
+        perfil.ExibirPainel();
         alunoLogado.VisualizarBoletim(diretor.Instituicao.Nome);
         Console.WriteLine("\nPressione Enter para voltar...");
         Console.ReadLine();
@@ -431,7 +433,7 @@ class Program
             if (diretor.Turmas.Count > 0)
                 return;
 
-            diretor.CadastrarTurmma("3º Ano A");
+            diretor.CadastrarTurma("3º Ano A");
 
             foreach (var profXml in autenticacao.ObterProfessoresXml())
             {
